@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "entries": {
+    "C:\\Users\\YOU\\Downloads\\example.xlsx": {
+      "tags": ["검토완료", "내부공유"],
+      "security_level": "P2"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "watch_settings": {
+    "target_directories": ["%USERPROFILE%\\Documents\\DocuDog_Watch"],
+    "exclude_directories": ["node_modules", ".git", "AppData"]
+  },
+  "file_filters": {
+    "allowed_extensions": [".txt", ".md", ".docx", ".xlsx", ".pptx", ".pdf"],
+    "size_limit": {
+      "min_bytes": 1024,
+      "max_bytes": 52428800
+    }
+  },
+  "idle_settings": {
+    "idle_trigger_seconds": 120,
+    "skip_idle_wait_for_testing": false
+  },
+  "runtime_settings": {
+    "debug_python_logs": false
+  },
+  "paths": {
+    "state_path": "%USERPROFILE%\\Documents\\DocuDog_state.json",
+    "report_path": "%USERPROFILE%\\Documents\\classification_report.md",
+    "audit_log_path": "",
+    "tag_overrides_path": "",
+    "run_lock_path": ""
+  },
+  "lineage_settings": {
+    "enabled": true,
+    "output_path": "",
+    "clustering": "both",
+    "similarity_threshold": 0.58,
+    "filename_weight": 0.55,
+    "summary_weight": 0.45,
+    "max_files_for_similarity": 400,
+    "llm_cluster_hints": false,
+    "llm_max_hint_groups": 8,
+    "llm_hint_max_tokens": 384,
+    "context_bundles_enabled": true,
+    "context_bundle_window_minutes": 30,
+    "context_bundle_same_folder_only": false,
+    "context_bundle_extra_directories": [],
+    "context_bundle_max_bundles": 60,
+    "context_bundle_max_event_buffer": 800
+  },
+  "audit_settings": {
+    "enabled": true,
+    "llm_handling_hint": true,
+    "max_excerpt_chars": 1200,
+    "llm_max_tokens": 256
+  },
+  "model": {
+    "enable_litert_lm": false,
+    "enable_lm_studio": true,
+    "inference_preference": "lm_studio",
+    "use_mock": false,
+    "litert_lm_bundle_path": "",
+    "lm_studio": {
+      "base_url": "http://127.0.0.1:1234",
+      "model": "",
+      "timeout_seconds": 120,
+      "max_tokens": 512,
+      "api_key": "",
+      "temperature": 0.2
+    },
+    "startup_probe": false,
+    "startup_dialogue_probe": false,
+    "startup_dialogue_max_tokens": 512,
+    "litert_max_output_tokens": 2048,
+    "max_context_chars": 900,
+    "litert_classify_context_cap": 320,
+    "litert_aux_max_user_chars": 200
+  }
+}

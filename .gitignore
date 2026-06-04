@@ -1,0 +1,28 @@
+# Local model weights and HF cache under repo
+/models/
+
+# Local runtime config (copy from config.example.json)
+config.json
+config.yml
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# DocuDog runtime output (local)
+out/
+_main_stderr.txt
+_main_stdout.txt
+DocuDog_state.json
+DocuDog_main.lock
+classification_report.md
+DocuDog_audit_log.md
+DocuDog_lineage.md
+DocuDog_tag_overrides.json
+
+# Reference subtree (not part of shipped MVP)
+reference/
