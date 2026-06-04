@@ -1,0 +1,37 @@
+DocuDog fixture — release checklist (plain text)
+================================================
+
+Purpose
+-------
+Checklist-style fixture for extension and keyword variety in mock/real classify runs.
+
+Pre-release checks
+------------------
+[ ] classification_report.md receives a new row after classify_one
+[ ] DocuDog_state.json records sha256 and last_analyzed_utc
+[ ] Unchanged file re-run shows skipped_unchanged on stdout
+[ ] Modified file triggers analyzed again
+
+Security level hints (fictional)
+----------------------------------
+This paragraph mentions internal project code PHANTOM-42 and draft budget figures.
+It is synthetic data for testing tag and P-level output only — not real secrets.
+
+Padding to satisfy file_filters.size_limit.min_bytes (1024)
+-------------------------------------------------------------
+Filler line 001: docudog regression fixture release checklist padding block.
+Filler line 002: docudog regression fixture release checklist padding block.
+Filler line 003: docudog regression fixture release checklist padding block.
+Filler line 004: docudog regression fixture release checklist padding block.
+Filler line 005: docudog regression fixture release checklist padding block.
+Filler line 006: docudog regression fixture release checklist padding block.
+Filler line 007: docudog regression fixture release checklist padding block.
+Filler line 008: docudog regression fixture release checklist padding block.
+Filler line 009: docudog regression fixture release checklist padding block.
+Filler line 010: docudog regression fixture release checklist padding block.
+Filler line 011: docudog regression fixture release checklist padding block.
+Filler line 012: docudog regression fixture release checklist padding block.
+Filler line 013: docudog regression fixture release checklist padding block.
+Filler line 014: docudog regression fixture release checklist padding block.
+Filler line 015: docudog regression fixture release checklist padding block.
+End padding.

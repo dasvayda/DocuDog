@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -13,7 +14,7 @@ import warnings
 from typing import Any
 
 import psutil
-from docudog import context_bundles, inference, lineage, router, watcher
+from docudog import context_bundles, inference, lineage, router, single_file, watcher
 from docudog.config_loader import load_app_config
 
 logger = logging.getLogger(__name__)
@@ -298,10 +299,75 @@ def _log_startup_environment_sanity(
         )
 
 
+def _parse_cli() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="DocuDog Stage 1 watcher (idle-aware background classify)."
+    )
+    parser.add_argument(
+        "--file",
+        metavar="PATH",
+        help="Classify one file and exit (no watcher, no run lock). Same pipeline as tools/classify_one.py.",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Process one queued file then exit (also DOCUDOG_RUN_ONCE=1).",
+    )
+    return parser.parse_args()
+
+
+def _run_once_enabled(args: argparse.Namespace) -> bool:
+    if args.once:
+        return True
+    return os.environ.get("DOCUDOG_RUN_ONCE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _run_single_file_cli(
+    cfg: dict[str, Any],
+    state_path: str,
+    report_path: str,
+    file_path: str,
+) -> None:
+    """Smoke path: one file, no daemon lock or observer."""
+    state = load_state(state_path)
+
+    def persist() -> None:
+        save_state_atomic(state_path, state)
+
+    try:
+        result = single_file.process_single_path(
+            cfg,
+            state,
+            file_path,
+            report_path,
+            state_path,
+            persist,
+        )
+    except FileNotFoundError as e:
+        print(f"DocuDog: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    for line in single_file.format_result_lines(result, report_path):
+        print(line)
+
+    if result.outcome == single_file.SingleFileOutcome.REQUEUE:
+        sys.exit(1)
+    if result.outcome in (
+        single_file.SingleFileOutcome.SKIPPED_FILTER,
+        single_file.SingleFileOutcome.SKIPPED_EXTRACT,
+        single_file.SingleFileOutcome.SKIPPED_EMPTY,
+    ):
+        sys.exit(3)
+    sys.exit(0)
+
+
 def main() -> None:
     from docudog.env_litert import apply_litert_env_defaults
 
     apply_litert_env_defaults()
+
+    args = _parse_cli()
+    run_once = _run_once_enabled(args)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cfg_path = os.path.join(base_dir, "config.json")
@@ -356,6 +422,11 @@ def main() -> None:
     report_path = os.path.normpath(os.path.expandvars(report_path))
 
     _log_startup_environment_sanity(cfg, state_path, report_path)
+
+    if args.file:
+        inference.startup_model_probe(cfg)
+        _run_single_file_cli(cfg, state_path, report_path, args.file)
+        return
 
     run_lock_path = _ensure_single_instance_or_replace(cfg, state_path)
     obs = None
@@ -417,8 +488,9 @@ def main() -> None:
             lineage_disp = "(disabled)"
 
         logger.info(
-            "DocuDog engine started. Idle trigger=%ss. state=%s report=%s lineage=%s run_lock=%s",
+            "DocuDog engine started. Idle trigger=%ss run_once=%s. state=%s report=%s lineage=%s run_lock=%s",
             idle_seconds,
+            run_once,
             state_path,
             report_path,
             lineage_disp,
@@ -451,6 +523,11 @@ def main() -> None:
                     try:
                         next_path, file_event_unix = file_queue.get_nowait()
                     except queue.Empty:
+                        if run_once:
+                            logger.info(
+                                "run_once: queue empty after idle wait; exiting without processing."
+                            )
+                            break
                         time.sleep(0.5)
                         now = time.monotonic()
                         if now - queue_heartbeat_last >= 30.0:
@@ -485,13 +562,28 @@ def main() -> None:
                         )
                         if outcome == "requeue":
                             file_queue.put((next_path, file_event_unix))
+                            if run_once:
+                                logger.info(
+                                    "run_once: item requeued (user active); exiting."
+                                )
+                                break
                         else:
                             try:
                                 lineage.regenerate_if_enabled(cfg, state, report_path)
                             except Exception:
                                 logger.exception("Lineage map update failed")
+                            if run_once:
+                                logger.info(
+                                    "run_once: processed one queue item (%s); exiting.",
+                                    next_path,
+                                )
+                                break
                     except Exception:
                         logger.exception("Unexpected error while processing %s", next_path)
+                        if run_once:
+                            break
+                if run_once:
+                    break
         finally:
             if obs is not None:
                 obs.stop()

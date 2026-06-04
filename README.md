@@ -76,11 +76,35 @@ python tools/download_litert_gemma.py
 
 저장소 **루트**에서 실행합니다 (`config.json`이 현재 디렉터리 기준으로 로드됩니다).
 
+**첫 분류 스모크 (유휴·워처 없음):**
+
+```powershell
+python tools/classify_one.py fixtures\sample_internal_memo.md
+# 또는
+python main.py --file fixtures\sample_internal_memo.md
+```
+
+**백그라운드 데몬:**
+
 ```powershell
 python main.py
 ```
 
-- 단일 인스턴스: 같은 `main.py`가 이미 떠 있으면 이전 프로세스를 종료하고 재시작합니다.
+**큐에서 한 건만 처리 후 종료:**
+
+```powershell
+python main.py --once
+# 또는
+$env:DOCUDOG_RUN_ONCE = "1"; python main.py
+```
+
+**회귀 스모크 (mock, LLM 불필요):**
+
+```powershell
+python tools/regression_smoke.py
+```
+
+- 단일 인스턴스: 같은 `main.py`가 이미 떠 있으면 이전 프로세스를 종료하고 재시작합니다 (`--file` 모드는 run lock 없음).
 - 유휴 대기: `idle_settings.idle_trigger_seconds`(기본 60초) 또는 환경변수 `DOCUDOG_IDLE_TRIGGER_SECONDS`
 - 테스트용 즉시 처리: `idle_settings.skip_idle_wait_for_testing: true`
 

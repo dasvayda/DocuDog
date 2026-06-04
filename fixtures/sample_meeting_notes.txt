@@ -1,0 +1,35 @@
+DocuDog fixture — meeting notes (plain text)
+============================================
+
+Date: 2026-05-01 (synthetic)
+Attendees: team alpha (fixture only)
+
+Summary
+-------
+Weekly sync on document tagging pilot. Action items captured for local LLM tests.
+
+Action items
+------------
+1. Add sample files under fixtures/ for regression smoke.
+2. Verify hash-based skip when content is unchanged.
+3. Re-run classify after a one-line edit to confirm re-inference.
+
+Confidentiality reminder
+------------------------
+Do not paste real customer PII into fixture files. Use fictional names only.
+
+Padding section (required for min_bytes filter in config.example.json)
+----------------------------------------------------------------------
+The default minimum size is 1024 bytes. This block repeats neutral text so the
+file qualifies without embedding secrets. DocuDog extracts plain text, runs local
+or mock inference, and appends a row to classification_report.md. Editing any
+line above should change SHA-256 and trigger a new classification pass on the
+next classify_one or watcher cycle. Neutral filler: a b c d e f g h i j k l m n
+o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 repeat neutral filler end.
+
+Second padding paragraph for byte count: lorem ipsum docudog fixture smoke test
+pipeline extract classify report state json lineage optional audit log p1 p2.
+
+Third padding paragraph: watch idle queue router inference reporter owner tags.
+
+End of fixture.

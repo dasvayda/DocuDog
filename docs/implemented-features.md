@@ -18,6 +18,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 |------|------|
 | 2026-05-19 | 초안 작성(Stage 1 기능 정리); 코어 모듈을 **`docudog/`** 패키지로 정리(`main.py`는 루트 유지) |
 | 2026-05-19 | Context bundles(시간 윈도우 공동 출현): `lineage_settings` 키, `state.context_bundles`, lineage Markdown 섹션 |
+| 2026-06-04 | 단일 파일 스모크(`classify_one`, `main --file`), `--once`/`DOCUDOG_RUN_ONCE`, `fixtures/` + `regression_smoke.py` |
 
 ---
 
@@ -40,6 +41,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 추론 런타임 요약 로그 | 백엔드·번들/URL·모델 ID 등 | `docudog/inference.log_inference_runtime_summary` |
 | 시작 시 모델 프로브 | 설정에 따라 LiteRT 또는 HTTP 짧은 호출 | `docudog/inference.startup_model_probe` |
 | 유휴 루프 | 사용자 입력 유휴 후 큐 처리; 설정·환경변수로 유휴 시간 조정 | `main.py`, `docudog/watcher.sleep_while_busy` 등 |
+| 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
 
 ---
 
@@ -99,6 +101,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 스크립트 | 역할 |
 |-----------|------|
 | `download_litert_gemma.py` | 기본 HF 기준 LiteRT Gemma 번들 다운로드 안내 |
+| `classify_one.py` | 워처·유휴 없이 **한 파일** 추출→분류→stdout + 리포트 (`docudog/single_file.py`) |
+| `regression_smoke.py` | `fixtures/` 복사본으로 분류→hash 스킵→수정→재분류 (mock) |
 | `sync_tag_overrides.py` | 오버라이드 JSON을 state에 재반영(재추론 없음) |
 | `batch_eval.py`, `benchmark_inference.py`, `quick_test.py` | 평가·벤치·스모크 — 저장소 루트를 `sys.path`에 넣고 `from docudog import ...` |
 

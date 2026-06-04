@@ -15,17 +15,6 @@
 
 **목표(협업·로컬 유용성 검증):** 팀원이 설치했을 때 실사용 체감이 큰 순으로 검증한다. 아래 항목이 그에 맞춘 제안·백로그다.
 
-작은 단위로 만들고, 매번 **실제 파일·실제 백엔드**로 확인한 뒤 범위만 넓히는 순서를 권장합니다.
-
-- **1. 워처 없이 단일 파일 분류 스모크**  
-  `tools/` 또는 `main` 인자로 **파일 경로 하나**만 지정해 추출→분류→stdout/리포트 한 줄까지 검증. IDLE·큐 없이 회귀·LM Studio 전환 확인에 유리.
-
-- **2. 회귀용 최소 문서 픽스처 2~3개**  
-  repo 안에 짧은 `.txt`/`.md` 샘플 고정. “첫 분류 → 저장된 해시로 스킵 → 내용 수정 후 재분류”를 스크립트나 문서 절차로 재현 가능하게.
-
-- **3. 분류 1회 실행 후 종료 모드**  
-  환경변수 또는 플래그로 **큐 비우고 한 건만 처리 후 종료** (`skip_idle`과 조합). CI·수동 스모크에 쓰고, 안정되면 배치 확장.
-
 - **4. 시맨틱 변경 로그 (Semantic Commit Log / LLM diff 요약)**  
   **레퍼런스:** Git의 `word-diff`·lineage graph는 **줄·단어 단위 raw diff**에 익숙한 개발 워크플로용. 사무·기획 문서는 동일하게 보여주면 오히려 읽기 부담.  
   **아이디어:** 동일 논리 문서의 **이전 SHA vs 새 SHA**에서 추출한 텍스트 **델타(바뀐 구간)**만 로컬 LLM에 짧게 넘겨 **한 줄 요약**을 생성.  
@@ -58,6 +47,9 @@
 
 ### 완료 (Done)
 
+- **1. 워처 없이 단일 파일 분류 스모크** (`tools/classify_one.py`, `docudog/single_file.py`, `python main.py --file PATH`): IDLE·큐 없이 추출→분류→stdout + `classification_report.md` 한 행. — 2026-06-04
+- **2. 회귀용 최소 문서 픽스처** (`fixtures/` 3종, `fixtures/README.md`, `tools/regression_smoke.py`: 첫 분류 → hash 스킵 → 수정 후 재분류). — 2026-06-04
+- **3. 분류 1회 실행 후 종료 모드** (`python main.py --once`, `DOCUDOG_RUN_ONCE=1`: 큐에서 한 건 처리 후 종료; `skip_idle_wait_for_testing`과 조합 가능). — 2026-06-04
 - **2. 업무 컨텍스트 묶음 (Context bundles / 시간 윈도우)** (`docudog/context_bundles.py`, watcher 큐 `(경로, 시각)`, `state.context_bundles`, `lineage_settings.context_bundles_*`, `DocuDog_lineage.md` 표). — 2026-05-19
 - Stage 1 파이프라인: 감시 + 유휴 + 라우팅 + 텍스트 추출 + 로컬 LLM 분류 + `classification_report.md` + 선택적 `DocuDog_lineage.md` (파일명·해시 기반 pilot). — 2026-05
 - 설정: `config.json` + YAML 오버레이 (`docudog/config_loader.py`), `model.backend` — `litert_lm` / `lm_studio` / `openai_compatible`. — 2026-05
