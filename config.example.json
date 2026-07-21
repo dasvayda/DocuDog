@@ -1,6 +1,6 @@
 {
   "watch_settings": {
-    "target_directories": ["%USERPROFILE%\\Documents\\DocuDog_Watch"],
+    "target_directories": ["%USERPROFILE%/Documents/DocuDog_Watch"],
     "exclude_directories": ["node_modules", ".git", "AppData"]
   },
   "file_filters": {
@@ -18,8 +18,8 @@
     "debug_python_logs": false
   },
   "paths": {
-    "state_path": "%USERPROFILE%\\Documents\\DocuDog_state.json",
-    "report_path": "%USERPROFILE%\\Documents\\classification_report.md",
+    "state_path": "%USERPROFILE%/Documents/DocuDog_state.json",
+    "report_path": "%USERPROFILE%/Documents/classification_report.md",
     "audit_log_path": "",
     "tag_overrides_path": "",
     "run_lock_path": ""

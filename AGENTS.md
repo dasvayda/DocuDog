@@ -22,6 +22,8 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Owner tags | `docudog/owner_tags.py`, `DocuDog_tag_overrides.json`, `tools/sync_tag_overrides.py` | **No web UI** — local JSON; guide [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md) |
 | Config | `docudog/config_loader.py`, `main.load_config()`, `config.json` | Defaults + YAML overlay (`config.yml` / `config.yaml`): watch roots, filters, paths, `model.*`, `audit_settings`, `lineage_settings` |
 
+**Paths in config:** prefer forward slashes (`%USERPROFILE%/Documents/...`) so values paste cleanly from Explorer; Windows accepts them and `os.path.normpath` normalizes. `state_path` / `report_path` (and set `audit_log_path`) parent folders are created at startup if missing. Watch roots (`target_directories`) are **not** auto-created.
+
 ## Conventions
 
 - Prefer **small, focused diffs**; match existing style (type hints, `logger` not `print` for runtime).
@@ -45,7 +47,9 @@ HTTP / LM Studio block:
 
 - **`lm_studio`**: `base_url`, `model` (server id), `timeout_seconds` (default 120), optional `api_key`, `temperature`, optional `max_tokens`. Empty `model` skips HTTP → mock.
 
-- **`startup_probe`**: for HTTP backends, short `/v1/chat/completions` ping; same `DOCUDOG_SKIP_MODEL_PROBE` / `DOCUDOG_FORCE_STARTUP_PROBE` as LiteRT.
+- **OpenAI cloud (dev):** omit `enable_*` toggles; set `model.backend: openai_compatible`, `lm_studio.base_url: https://api.openai.com/v1`, `lm_studio.model: gpt-4o-mini` (or another small model). Secrets: repo-root **`.env`** with `OPENAI_API_KEY=...` (gitignored; loaded by `config_loader`). Empty `api_key` falls back to `OPENAI_API_KEY` / `DOCUDOG_API_KEY`. Template: [`.env.example`](.env.example).
+
+- **`startup_probe`**: for HTTP backends, short `/v1/chat/completions` ping; same `DOCUDOG_SKIP_MODEL_PROBE` / `DOCUDOG_FORCE_STARTUP_PROBE` as LiteRT. `GET /v1/models` sends Bearer when a key is present (needed for api.openai.com).
 
 - Overlay: merged via `deep_merge`; put only deltas in YAML — see [`config.example.yml`](config.example.yml).
 

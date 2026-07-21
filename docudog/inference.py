@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Optional
 
+from .config_loader import resolve_http_api_key
 from .env_litert import apply_litert_env_defaults, silence_litert_native_stderr
 
 logger = logging.getLogger(__name__)
@@ -287,7 +288,7 @@ def run_aux_completion(
                 if tout_raw is not None and str(tout_raw).strip() != ""
                 else 120.0
             )
-            api_key = str(lm_cfg.get("api_key") or "").strip()
+            api_key = resolve_http_api_key(lm_cfg)
             temperature = _lm_studio_temperature(lm_cfg)
             messages: list[dict[str, str]] = [
                 {"role": "system", "content": system},
@@ -503,16 +504,20 @@ def probe_openai_compatible_model_ids(
     base_url: str,
     *,
     timeout: float = 5.0,
+    api_key: str = "",
 ) -> tuple[list[str] | None, str]:
     """
     GET /v1/models (OpenAI-compatible). Returns (ids, diagnostic).
-    ids is None on HTTP/parse failure.
+    ids is None on HTTP/parse failure. Sends Bearer when api_key is set (required for api.openai.com).
     """
     url = _openai_models_list_url(base_url)
     if not url:
         return None, "empty base_url"
     try:
         req = urllib.request.Request(url, method="GET")
+        ak = (api_key or "").strip()
+        if ak:
+            req.add_header("Authorization", f"Bearer {ak}")
         with urllib.request.urlopen(req, timeout=max(1.0, float(timeout))) as resp:
             raw_body = resp.read().decode("utf-8", errors="replace")
         obj = json.loads(raw_body)
@@ -583,7 +588,11 @@ def log_inference_runtime_summary(config: dict[str, Any]) -> None:
             if tout is not None and str(tout).strip() != ""
             else 5.0
         )
-        ids, diag = probe_openai_compatible_model_ids(base, timeout=probe_timeout)
+        ids, diag = probe_openai_compatible_model_ids(
+            base,
+            timeout=probe_timeout,
+            api_key=resolve_http_api_key(lm_cfg),
+        )
         if ids is None:
             logger.warning(
                 "Inference: GET /v1/models failed (%s). "
@@ -1013,7 +1022,7 @@ def _startup_model_probe_http(backend: str, model_cfg: dict[str, Any]) -> None:
         if tout_raw is not None and str(tout_raw).strip() != ""
         else 120.0
     )
-    api_key = str(lm_cfg.get("api_key") or "").strip()
+    api_key = resolve_http_api_key(lm_cfg)
     ping_msgs = [{"role": "user", "content": "Reply with exactly one word: OK. No other text."}]
     ping_max_tokens = max(16, min(32, int(model_cfg.get("startup_probe_max_tokens", 48))))
 
@@ -1223,7 +1232,7 @@ def _classify_document_openai_http(
         if tout_raw is not None and str(tout_raw).strip() != ""
         else 120.0
     )
-    api_key = str(lm_cfg.get("api_key") or "").strip()
+    api_key = resolve_http_api_key(lm_cfg)
     temperature = _lm_studio_temperature(lm_cfg)
     max_tokens = _lm_studio_classify_max_tokens(model_cfg, lm_cfg)
 

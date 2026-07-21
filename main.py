@@ -15,7 +15,7 @@ from typing import Any
 
 import psutil
 from docudog import context_bundles, inference, lineage, router, single_file, watcher
-from docudog.config_loader import load_app_config
+from docudog.config_loader import load_app_config, resolve_http_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +222,22 @@ def _probe_dir_writable(dir_path: str) -> tuple[bool, str]:
         return False, str(e)
 
 
+def _ensure_parent_dir(file_path: str, *, label: str) -> bool:
+    """Create parent directory for a file path if missing. Returns True on success."""
+    parent = os.path.dirname(os.path.abspath(file_path))
+    if not parent:
+        parent = "."
+    existed = os.path.isdir(parent)
+    try:
+        os.makedirs(parent, exist_ok=True)
+        if not existed:
+            logger.info("Created %s directory: %s", label, parent)
+        return True
+    except OSError as e:
+        logger.warning("Could not create %s directory (%s): %s", label, parent, e)
+        return False
+
+
 def _log_startup_environment_sanity(
     cfg: dict[str, Any],
     state_path: str,
@@ -283,7 +299,11 @@ def _log_startup_environment_sanity(
             "Startup check: lm_studio.base_url empty — HTTP classify cannot run until set."
         )
         return
-    ids, diag = inference.probe_openai_compatible_model_ids(base, timeout=3.0)
+    ids, diag = inference.probe_openai_compatible_model_ids(
+        base,
+        timeout=3.0,
+        api_key=resolve_http_api_key(lm_cfg),
+    )
     if ids is None:
         logger.warning(
             "Startup check: could not reach LM Studio / OpenAI-compatible server at %s (%s). "
@@ -420,6 +440,15 @@ def main() -> None:
     )
     state_path = os.path.normpath(os.path.expandvars(state_path))
     report_path = os.path.normpath(os.path.expandvars(report_path))
+
+    _ensure_parent_dir(state_path, label="state_path")
+    _ensure_parent_dir(report_path, label="report_path")
+    audit_raw = str(paths.get("audit_log_path", "") or "").strip()
+    if audit_raw:
+        _ensure_parent_dir(
+            os.path.normpath(os.path.expandvars(audit_raw)),
+            label="audit_log_path",
+        )
 
     _log_startup_environment_sanity(cfg, state_path, report_path)
 

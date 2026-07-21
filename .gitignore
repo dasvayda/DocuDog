@@ -6,6 +6,11 @@ config.json
 config.yml
 config.yaml
 
+# API keys / local secrets
+.env
+.env.local
+*.pem
+
 # Python
 __pycache__/
 *.py[cod]

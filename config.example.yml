@@ -6,6 +6,16 @@
 #   both true -> set inference_preference: lm_studio | litert_lm
 #
 # If you omit enable_* keys entirely, legacy model.backend string is used.
+#
+# OpenAI cloud (small model for remote dev/test): omit enable_* and set
+#   model.backend: openai_compatible
+#   lm_studio.base_url: https://api.openai.com/v1
+#   lm_studio.model: gpt-4o-mini
+# Put the secret in repo-root .env as OPENAI_API_KEY=... (preferred), or here as api_key.
+#
+# Paths: prefer forward slashes (Windows-friendly paste), e.g.
+#   paths.state_path: "%USERPROFILE%/Documents/DocuDog/DocuDog_state.json"
+# state/report parents are created at startup; watch target_directories are not.
 
 model:
   enable_litert_lm: false
@@ -22,6 +32,19 @@ model:
     timeout_seconds: 120
     api_key: ""
     temperature: 0.2
+
+# --- OpenAI API example (uncomment; leave enable_* keys out of config.json) ---
+# model:
+#   backend: openai_compatible
+#   use_mock: false
+#   lm_studio:
+#     base_url: "https://api.openai.com/v1"
+#     model: "gpt-4o-mini"
+#     timeout_seconds: 120
+#     max_tokens: 512
+#     api_key: ""   # leave empty if OPENAI_API_KEY is in .env
+#     temperature: 0.2
+
 
 # audit_settings:
 #   enabled: true
