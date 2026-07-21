@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable
 
-from . import lineage, router
+from . import lineage, reporter, router
 
 
 def _always_idle() -> float:
@@ -164,4 +164,6 @@ def format_result_lines(result: SingleFileResult, report_path: str) -> list[str]
     if result.inference_source:
         lines.append(f"  inference: {result.inference_source}")
     lines.append(f"  report: {os.path.normpath(os.path.expandvars(report_path))}")
+    html_sib = reporter.html_path_for_report(report_path)
+    lines.append(f"  report_html: {html_sib}")
     return lines

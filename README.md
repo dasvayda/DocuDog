@@ -10,7 +10,7 @@ Windows 로컬 PC에서 문서를 조용히 감시하고, **유휴(idle) 시간*
 - 지정 폴더의 문서 생성·수정을 백그라운드에서 수집
 - 사용자 입력이 **일정 시간 유휴**일 때만 처리해 CPU/GPU 부하를 줄임
 - 로컬 LLM으로 **태그**, **보안 등급(P1–P4)**, **요약** 생성
-- `classification_report.md`, `DocuDog_state.json`, (옵션) 감사·lineage Markdown을 **로컬에만** 기록
+- `classification_report.md`, `classification_report.html`(동일 basename), `DocuDog_state.json`, (옵션) 감사·lineage Markdown을 **로컬에만** 기록
 - 원본·추론 과정을 클라우드로 보내지 않는 **로컬 프라이버시** 거버넌스 검증
 
 ## 현재 구현 범위 (Stage 1)
@@ -115,6 +115,7 @@ python tools/regression_smoke.py
 | 파일 | 내용 |
 |------|------|
 | `classification_report.md` | 파일별 태그·등급·요약 |
+| `classification_report.html` | 위 MD와 동일 내용(브라우저용, 자동 동기화) |
 | `DocuDog_state.json` | 해시·메타, 마지막 추론 백엔드 |
 | `DocuDog_audit_log.md` | P1/P2 분류 시 감사 행 |
 | `DocuDog_lineage.md` | 파일명·유사도 기반 lineage(Mermaid) |

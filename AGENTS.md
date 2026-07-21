@@ -16,7 +16,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Route | `docudog/router.py` | Filters, hash dedupe, extract, call `inference`, reporter |
 | LLM | `docudog/inference.py` | LiteRT-LM, LM Studio/OpenAI-compatible HTTP (`/v1/chat/completions`), mock |
 | LiteRT env | `docudog/env_litert.py` | Native log suppression, `apply_litert_env_defaults()` |
-| Report | `docudog/reporter.py` | Append rows to `classification_report.md` |
+| Report | `docudog/reporter.py` | Append rows to `classification_report.md` and sync sibling `classification_report.html` |
 | Lineage | `docudog/lineage.py` | Mermaid map + optional `llm_cluster_hints`; **similarity** clustering (`clustering`, Jaccard+difflib) |
 | Audit | `docudog/audit.py` | P1/P2 append-only `DocuDog_audit_log.md` + optional LLM handling hint |
 | Owner tags | `docudog/owner_tags.py`, `DocuDog_tag_overrides.json`, `tools/sync_tag_overrides.py` | **No web UI** — local JSON; guide [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md) |

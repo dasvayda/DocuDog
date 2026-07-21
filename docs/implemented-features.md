@@ -19,6 +19,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-05-19 | 초안 작성(Stage 1 기능 정리); 코어 모듈을 **`docudog/`** 패키지로 정리(`main.py`는 루트 유지) |
 | 2026-05-19 | Context bundles(시간 윈도우 공동 출현): `lineage_settings` 키, `state.context_bundles`, lineage Markdown 섹션 |
 | 2026-06-04 | 단일 파일 스모크(`classify_one`, `main --file`), `--once`/`DOCUDOG_RUN_ONCE`, `fixtures/` + `regression_smoke.py` |
+| 2026-07-22 | 분류 리포트 HTML 동기화(`classification_report.html`, MD와 동일 basename) |
 
 ---
 
@@ -89,6 +90,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 산출물 | 설명 | 모듈 |
 |--------|------|------|
 | `classification_report.md` | 분류 행 append; Inference 열(구 리포트 호환); 말미 `_Last inference: ..._` 메타(HTML 주석 블록으로 치환) | `docudog/reporter.py` |
+| `classification_report.html` | MD와 **동일 basename**; 분류/노트 append 및 시작 시 MD에서 동기화(브라우저 열람용) | `docudog/reporter.sync_report_html` |
 | `DocuDog_state.json` | 파일별 해시·메타; 최상위 `last_inference_backend`, `last_inference_utc`; 선택 `context_bundles` | `main.load_state` / `docudog/router` |
 | `DocuDog_audit_log.md` | **P1·P2**일 때만 append; 선택적 handling 힌트 열 | `docudog/audit.py` |
 | `DocuDog_lineage.md` | 옵션; 파일명·해시 기반 lineage 및 Mermaid; 선택 **Context bundles** 섹션 | `docudog/lineage.py` |

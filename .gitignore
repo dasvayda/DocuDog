@@ -3,6 +3,7 @@
 
 # Local runtime config (copy from config.example.json)
 config.json
+config.json.bak
 config.yml
 config.yaml
 

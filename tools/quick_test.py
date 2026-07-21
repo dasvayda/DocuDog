@@ -39,6 +39,8 @@ def main() -> int:
     os.write(fd, sample)
     os.close(fd)
     txt_path = os.path.normpath(txt_path)
+    report_path = ""
+    html_path = ""
 
     try:
         text, reason = router.extract_document_text(txt_path)
@@ -70,17 +72,26 @@ def main() -> int:
         with open(report_path, encoding="utf-8") as rf:
             body = rf.read()
         assert "|" in body
+        html_path = reporter.html_path_for_report(report_path)
+        assert os.path.isfile(html_path), html_path
+        with open(html_path, encoding="utf-8") as hf:
+            html_body = hf.read()
+        assert "<table>" in html_body
 
         print("quick_test: OK")
         print("  sample file:", txt_path)
         print("  report:", report_path)
+        print("  report_html:", html_path)
         print("  mock tags:", out.get("tags"))
         return 0
     finally:
-        try:
-            os.unlink(txt_path)
-        except OSError:
-            pass
+        for p in (txt_path, report_path, html_path):
+            if not p:
+                continue
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

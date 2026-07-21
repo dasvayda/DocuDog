@@ -14,7 +14,7 @@ import warnings
 from typing import Any
 
 import psutil
-from docudog import context_bundles, inference, lineage, router, single_file, watcher
+from docudog import context_bundles, inference, lineage, reporter, router, single_file, watcher
 from docudog.config_loader import load_app_config, resolve_http_api_key
 
 logger = logging.getLogger(__name__)
@@ -449,6 +449,10 @@ def main() -> None:
             os.path.normpath(os.path.expandvars(audit_raw)),
             label="audit_log_path",
         )
+    if os.path.isfile(report_path):
+        html_out = reporter.sync_report_html(report_path)
+        if html_out:
+            logger.info("Synced HTML report: %s", html_out)
 
     _log_startup_environment_sanity(cfg, state_path, report_path)
 
