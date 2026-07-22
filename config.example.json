@@ -51,6 +51,7 @@
   "model": {
     "enable_litert_lm": false,
     "enable_lm_studio": true,
+    "enable_openai": false,
     "inference_preference": "lm_studio",
     "use_mock": false,
     "litert_lm_bundle_path": "",
@@ -58,6 +59,14 @@
       "base_url": "http://127.0.0.1:1234",
       "model": "",
       "timeout_seconds": 120,
+      "max_tokens": 512,
+      "api_key": "",
+      "temperature": 0.2
+    },
+    "openai": {
+      "base_url": "https://api.openai.com",
+      "model": "gpt-4o-mini",
+      "timeout_seconds": 60,
       "max_tokens": 512,
       "api_key": "",
       "temperature": 0.2

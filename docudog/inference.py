@@ -85,7 +85,7 @@ DOCUDOG_META_SOURCE = "_docudog_inference_source"
 DOCUDOG_META_REASON = "_docudog_inference_reason"
 
 # 배치 도구 likely_mock 판별용 — 프로덕션 LiteRT / LM Studio / 기타 OpenAI 호환 서버
-REAL_INFERENCE_SOURCES = frozenset({"lite_rt", "lm_studio", "openai_compatible"})
+REAL_INFERENCE_SOURCES = frozenset({"lite_rt", "lm_studio", "openai", "openai_compatible"})
 
 _SECURITY_LEVEL_RE = re.compile(r"^P[1-4]$")
 
@@ -273,8 +273,8 @@ def run_aux_completion(
         return ""
     apply_litert_env_defaults()
     try:
-        if backend in ("lm_studio", "openai_compatible"):
-            lm_cfg = _coerce_lm_studio_section(model_cfg)
+        if backend in ("lm_studio", "openai", "openai_compatible"):
+            lm_cfg = _coerce_http_section(model_cfg, backend)
             base_url = str(lm_cfg.get("base_url") or "").strip()
             model_name = str(lm_cfg.get("model") or "").strip()
             if not base_url or not model_name:
@@ -414,51 +414,84 @@ def _boolish_config(v: Any) -> bool:
     return s in ("1", "true", "yes", "on")
 
 
+_BACKEND_PREF_ALIASES: dict[str, str] = {
+    "litert_lm": "litert_lm",
+    "litert": "litert_lm",
+    "litert-lm": "litert_lm",
+    "litertlm": "litert_lm",
+    "lm_studio": "lm_studio",
+    "lmstudio": "lm_studio",
+    "openai": "openai",
+    "openai_compatible": "openai",
+    "gpt": "openai",
+}
+
+# Priority used when multiple backends are enabled but inference_preference is
+# unset/invalid, or doesn't name one of the currently-enabled backends.
+_BACKEND_FALLBACK_ORDER = ("lm_studio", "openai", "litert_lm")
+
+
 def _normalize_backend(model_cfg: dict[str, Any]) -> str:
     """
     Resolve active inference backend.
 
-    **Toggle mode:** If `enable_litert_lm` and/or `enable_lm_studio` appears in config,
-    booleans choose the backend (avoids typos in `backend` string). If both are true,
-    `inference_preference` is `lm_studio` or `litert_lm` (default `lm_studio`).
-    If both false, returns ``BACKEND_DISABLED`` (mock with reason).
+    **Toggle mode:** If any of `enable_litert_lm` / `enable_lm_studio` / `enable_openai`
+    appears in config, those booleans choose which backend(s) are candidates (avoids
+    typos in `backend` string). Each configured server keeps its own settings block
+    (`model.lm_studio`, `model.openai`) so switching doesn't require overwriting keys.
+    If exactly one is enabled, it's used. If more than one is enabled,
+    `inference_preference` (`litert_lm` | `lm_studio` | `openai`) picks which; if unset
+    or invalid, falls back to lm_studio > openai > litert_lm. If none are enabled,
+    returns ``BACKEND_DISABLED`` (mock with reason).
 
-    **Legacy:** If neither enable key is present, `model.backend` string is used:
+    **Legacy:** If no enable key is present, `model.backend` string is used:
     litert_lm | lm_studio | openai_compatible (default litert_lm when empty/unknown).
     """
     toggle_present = (
-        "enable_litert_lm" in model_cfg or "enable_lm_studio" in model_cfg
+        "enable_litert_lm" in model_cfg
+        or "enable_lm_studio" in model_cfg
+        or "enable_openai" in model_cfg
     )
     if toggle_present:
-        L = _boolish_config(model_cfg.get("enable_litert_lm", False))
-        M = _boolish_config(model_cfg.get("enable_lm_studio", False))
-        if L and M:
-            pref = str(model_cfg.get("inference_preference") or "lm_studio").strip().lower()
-            if pref in ("litert_lm", "litert", "litert-lm", "litertlm"):
-                logger.info(
-                    "Both backends enabled; inference_preference=%s (litert_lm).",
-                    pref,
-                )
-                return "litert_lm"
-            if pref in ("lm_studio", "lmstudio"):
-                logger.info(
-                    "Both backends enabled; inference_preference=%s (lm_studio).",
-                    pref,
-                )
-                return "lm_studio"
-            logger.warning(
-                "Both backends on; invalid inference_preference %r — using lm_studio.",
-                model_cfg.get("inference_preference"),
+        enabled: list[str] = []
+        if _boolish_config(model_cfg.get("enable_litert_lm", False)):
+            enabled.append("litert_lm")
+        if _boolish_config(model_cfg.get("enable_lm_studio", False)):
+            enabled.append("lm_studio")
+        if _boolish_config(model_cfg.get("enable_openai", False)):
+            enabled.append("openai")
+
+        if not enabled:
+            logger.info(
+                "enable_litert_lm / enable_lm_studio / enable_openai all false — "
+                "inference backends disabled (mock)."
             )
-            return "lm_studio"
-        if M:
-            return "lm_studio"
-        if L:
-            return "litert_lm"
-        logger.info(
-            "enable_litert_lm and enable_lm_studio both false — inference backends disabled (mock)."
-        )
-        return BACKEND_DISABLED
+            return BACKEND_DISABLED
+
+        if len(enabled) == 1:
+            return enabled[0]
+
+        pref_raw = str(model_cfg.get("inference_preference") or "").strip().lower()
+        chosen = _BACKEND_PREF_ALIASES.get(pref_raw)
+        if chosen and chosen in enabled:
+            logger.info(
+                "Multiple backends enabled (%s); inference_preference=%s -> %s.",
+                enabled,
+                pref_raw,
+                chosen,
+            )
+            return chosen
+
+        for candidate in _BACKEND_FALLBACK_ORDER:
+            if candidate in enabled:
+                logger.warning(
+                    "Multiple backends enabled (%s); invalid/unset inference_preference "
+                    "%r — using %s.",
+                    enabled,
+                    model_cfg.get("inference_preference"),
+                    candidate,
+                )
+                return candidate
 
     raw = str(model_cfg.get("backend") or "").strip().lower()
     if raw in ("", "litert", "litert_lm", "litert-lm", "litertlm"):
@@ -477,7 +510,8 @@ def _normalize_backend(model_cfg: dict[str, Any]) -> str:
 def resolve_inference_backend(model_cfg: dict[str, Any]) -> str:
     """
     Resolve configured inference backend for diagnostics and startup checks.
-    Returns ``litert_lm``, ``lm_studio``, ``openai_compatible``, or ``BACKEND_DISABLED``.
+    Returns ``litert_lm``, ``lm_studio``, ``openai``, ``openai_compatible``, or
+    ``BACKEND_DISABLED``.
     """
     return _normalize_backend(model_cfg)
 
@@ -562,8 +596,8 @@ def log_inference_runtime_summary(config: dict[str, Any]) -> None:
         )
         return
 
-    if backend in ("lm_studio", "openai_compatible"):
-        lm_cfg = _coerce_lm_studio_section(model_cfg)
+    if backend in ("lm_studio", "openai", "openai_compatible"):
+        lm_cfg = _coerce_http_section(model_cfg, backend)
         base = str(lm_cfg.get("base_url") or "").strip()
         mid = str(lm_cfg.get("model") or "").strip()
         logger.info(
@@ -650,9 +684,19 @@ def log_inference_runtime_summary(config: dict[str, Any]) -> None:
         )
 
 
-def _coerce_lm_studio_section(model_cfg: dict[str, Any]) -> dict[str, Any]:
-    raw = model_cfg.get("lm_studio")
-    return dict(raw) if isinstance(raw, dict) else {}
+def _coerce_http_section(model_cfg: dict[str, Any], backend: str) -> dict[str, Any]:
+    """
+    HTTP server settings for the resolved backend. `openai` reads `model.openai`
+    (defaults to https://api.openai.com); everything else (`lm_studio`,
+    legacy `openai_compatible`) reads `model.lm_studio` — each backend keeps its
+    own block so enabling one doesn't require overwriting the other's settings.
+    """
+    key = "openai" if backend == "openai" else "lm_studio"
+    raw = model_cfg.get(key)
+    cfg = dict(raw) if isinstance(raw, dict) else {}
+    if backend == "openai" and not str(cfg.get("base_url") or "").strip():
+        cfg["base_url"] = "https://api.openai.com"
+    return cfg
 
 
 def _lm_studio_temperature(lm_cfg: dict[str, Any]) -> float | None:
@@ -1003,7 +1047,7 @@ def _run_startup_dialogue_probe(
 
 
 def _startup_model_probe_http(backend: str, model_cfg: dict[str, Any]) -> None:
-    lm_cfg = _coerce_lm_studio_section(model_cfg)
+    lm_cfg = _coerce_http_section(model_cfg, backend)
     base_url = str(lm_cfg.get("base_url") or "").strip()
     model_name = str(lm_cfg.get("model") or "").strip()
     if not base_url or not model_name:
@@ -1115,7 +1159,7 @@ def startup_model_probe(config: dict[str, Any]) -> None:
         logger.info("LLM probe: skipped (enable_litert_lm and enable_lm_studio both false).")
         return
 
-    if backend in ("lm_studio", "openai_compatible"):
+    if backend in ("lm_studio", "openai", "openai_compatible"):
         _startup_model_probe_http(backend, model_cfg)
         return
 
@@ -1212,11 +1256,11 @@ def _classify_document_openai_http(
     source_tag: str,
     should_yield: Optional[Callable[[], bool]],
 ) -> dict[str, Any]:
-    lm_cfg = _coerce_lm_studio_section(model_cfg)
+    lm_cfg = _coerce_http_section(model_cfg, source_tag)
     base_url = str(lm_cfg.get("base_url") or "").strip()
     model_name = str(lm_cfg.get("model") or "").strip()
     if not base_url or not model_name:
-        _warn_mock_when_lite_expected("lm_studio base_url/model empty (skipped HTTP classify)")
+        _warn_mock_when_lite_expected("lm_studio/openai base_url/model empty (skipped HTTP classify)")
         return _with_inference_meta(
             mock_inference(clipped), "mock", "http_config_incomplete"
         )
@@ -1267,10 +1311,12 @@ def _classify_document_openai_http(
         else:
             logger.error(
                 "LLM task=classify status=fail source=%s | %s | "
-                "If timed out: raise model.lm_studio.timeout_seconds (remote/slow host); "
-                "optionally lower model.litert_max_output_tokens or lm_studio.max_tokens.",
+                "If timed out: raise model.%s.timeout_seconds (remote/slow host); "
+                "optionally lower model.litert_max_output_tokens or model.%s.max_tokens.",
                 source_tag,
                 e,
+                "openai" if source_tag == "openai" else "lm_studio",
+                "openai" if source_tag == "openai" else "lm_studio",
             )
         _warn_mock_when_lite_expected(str(e))
         return _with_inference_meta(mock_inference(clipped), "mock", "http_error")
@@ -1387,7 +1433,7 @@ def classify_document(
             mock_inference(clipped), "mock", "inference_backends_disabled"
         )
 
-    if backend in ("lm_studio", "openai_compatible"):
+    if backend in ("lm_studio", "openai", "openai_compatible"):
         return _classify_document_openai_http(
             clipped, model_cfg, backend, should_yield
         )
