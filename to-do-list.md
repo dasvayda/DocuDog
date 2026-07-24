@@ -64,6 +64,28 @@ LLM-Wiki는 **사용자가 질의하는 개인/팀 위키**(Obsidian + 에이전
   **쉬운 UI 방향:** 리포트/감사로그 최상단에 3~5줄짜리 다이제스트 카드(표는 그 아래 상세용으로 유지). 신규 파일 없이 기존 두 문서 상단만 수정.  
   **구현(방향):** `docudog/audit.py` 집계 로직 재사용, `reporter.py` 헤더 생성부에 요약 카드 삽입.
 
+**목표(모바일·로컬 LLM 사용자, 2026-07-24):** PC 백그라운드 watcher와 별 레인. 공통 코어(추출→분류→등급→로컬 산출물)는 재사용하되, **공유·배터리·짧은 확인 UI**가 모바일에서 사용 빈도·만족도를 좌우한다. 전용 네이티브 앱 전체가 아니라 **Share/다운로드 진입점 + 전력 게이트 + 한 화면 요약** 3축만 Stage 2 후보로 적는다.
+
+- **12. 공유·다운로드 직후 1회 분류 (Share-to-classify)**  
+  **빈도·만족:** 모바일 local LLM 사용자의 문서 유입은 **카톡·메일·브라우저 “저장/공유”**가 대부분(일 수십 회). 저장 직후 **P-level·태그·한 줄 summary**를 보는 순간 만족도가 가장 크고, “잘못된 채팅방에 P1을 붙여넣기 전에 막았다”는 체감과 직결.  
+  **DocuDog화:** Android Share Target / iOS Share Extension(또는 1단계로 **Downloads·Inbox 감시 + `classify_one` 1회**) → 기존 `docudog/single_file.py` 파이프라인. 산출: `classification_report` 행 + **`DocuDog_last_classify.json`**(경로·등급·summary·utc)로 다른 앱/단축어가 읽기. 클라우드 업로드·채팅 전송 **전** 로컬에서만 판단.  
+  **확인:** 공유로 PDF/txt 저장 → 30초 내 last_classify json 갱신·등급 표시(알림 또는 Files 미리보기).  
+  **범위:** Windows `main --file` 패턴 검증 후 모바일 companion; 채팅형 LLM UI는 만들지 않음.
+
+- **13. 충전·배터리·발열 게이트 (Power-aware idle)**  
+  **빈도·만족:** 모바일 local LLM은 **매일 백그라운드**를 쓰지만 배터리·발열 불만이 이탈 1순위. “충전 중·화면 꺼짐·배터리 N% 이상일 때만 추론”이 있으면 **신뢰·재설치율**이 올라감(사용 빈도는 passive지만 **만족도 기여가 큼**).  
+  **DocuDog화:** `idle_settings` 확장 — `min_battery_percent`, `require_charging`, `defer_on_thermal_throttle`(OS API 또는 휴리스틱). 큐는 쌓되 LiteRT/Gemma 추론만 게이트; hash 스킵·규칙 1차 매칭(#6)은 저전력으로 선행 가능. Windows 노트북(배터리 모드)에도 동일 키 재사용.  
+  **확인:** 배터리 20%·미충전 시 큐 적재만, 충전+유휴 시 처리; activity log에 `[defer_power]` 기록.  
+  **범위:** `docudog/watcher.py` + config; Android/iOS는 WorkManager/BGTask로 동일 정책 매핑.
+
+- **14. 모바일 한 화면 다이제스트 (`DocuDog_mobile_digest.html` 또는 json)**  
+  **빈도·만족:** local LLM 사용자는 **결과를 자주 열람**(하루 여러 번)하지만 `classification_report.md` 표는 폰에서 읽기 어렵다. **3~5줄 + P1/P2 건수 + 미분류 경고(#10 연동)** 만 있는 단일 파일이면 Files/브라우저·홈 위젯/단축어로 **짧게 확인** 가능 — #11 데스크톱 다이제스트의 **모바일 뷰포트 버전**.  
+  **DocuDog화:** 분류·audit·스킵 집계 후 **갱신되는 경량 HTML**(또는 json) 1파일; 사용자가 이미 쓰는 **로컬 동기화 폴더**(iCloud/Drive/Synology)에 출력 — DocuDog 서버 없음. 상단: “오늘 P1 n건 · 미분류 m건 · 마지막 추론 backend”; 탭하면 기존 리포트 링크(선택).  
+  **확인:** 폰 브라우저에서 digest만 열어 당일 P1·미분류 숫자가 맞는지; 새 공유 파일(#12) 후 digest 갱신 지연 측정.  
+  **범위:** `docudog/reporter.py` 또는 소형 `render_mobile_digest()`; #9·#10·#11과 데이터 공유, UI는 digest 전용.
+
+**모바일 3종 우선순위:** #12 공유 직후 분류(체감 가치) → #13 전력 게이트(유지 만족) → #14 digest(재방문 빈도).
+
 ---
 
 ### 보류 (Deferred)
