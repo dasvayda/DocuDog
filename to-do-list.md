@@ -13,6 +13,14 @@
 
 ### 대기 (Next)
 
+> **2026-07-31(4) 추가 완료:** #17 categories · #4 semantic_history · #5 UNC/retry.
+
+> **2026-07-31(3) 추가 완료:** #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify.
+
+> **2026-07-31(2) 추가 완료:** #11 액션 다이제스트 · #8 lint_governance · #19 search_corpus · #6 rule_hints · #16 related_docs.
+
+> **2026-07-31 구현 완료로 Done로 이동:** #7 activity log · #9 등급 라벨 · #10 미분류 경고 · #15 output spec · #20 status 대시보드. 상세는 `### 완료 (Done)`.
+
 **목표(협업·로컬 유용성 검증):** 팀원이 설치했을 때 실사용 체감이 큰 순으로 검증한다. 아래 항목이 그에 맞춘 제안·백로그다.
 
 - **4. 시맨틱 변경 로그 (Semantic Commit Log / LLM diff 요약)**  
@@ -175,6 +183,24 @@ Bento는 로컬 우선 단일 파일 오피스 앱(슬라이드 편집기 + CRDT
 
 ### 완료 (Done)
 
+- **17. 업무 카테고리 few-shot** (`docudog/categories.py`, `DocuDog_categories.example.json`, `category_settings`): 선택지 강제 → `state.category_ids` / 리포트 Tags 접두. — 2026-07-31
+- **4. 시맨틱 변경 로그** (`docudog/semantic_diff.py`): `summary_history` + `last_change_summary`(휴리스틱; 선택 LLM); status/lineage 섹션. — 2026-07-31
+- **5. UNC/NAS 감시 보강** (`paths_util`, watcher dedupe/retry, UNC 로그): 공유 잠금 재시도·이벤트 디듑·단일 state 정책 명시. — 2026-07-31
+- **18. cadence 리마인더** (`docudog/cadence.py`, `cadence_settings`): 주/월 패턴 부재 → status·action digest·`[cadence_miss]` (일 1회). — 2026-07-31
+- **13. Power-aware idle** (`docudog/power_gate.py`, `idle_settings.min_battery_percent`/`require_charging`): 추론 전 게이트, `[defer_power]`, 큐 유지. — 2026-07-31
+- **14. 모바일 digest** (`docudog/mobile_digest.py` → `DocuDog_mobile_digest.html`+`.json`). — 2026-07-31
+- **20b. lineage 경량화** (`include_mermaid` 기본 false, `include_singleton_list`, `slim_intro`). — 2026-07-31
+- **12. last_classify companion** (`docudog/last_classify.py` → `DocuDog_last_classify.json`, 분류 성공 시). — 2026-07-31
+- **11. 액션 다이제스트** (docudog/action_digest.py → status 「지금 할 일」). — 2026-07-31
+- **8. 거버넌스 lint** (`tools/lint_governance.py` → DocuDog_lint_report.md). — 2026-07-31
+- **19. 코퍼스 검색 CLI** (`tools/search_corpus.py`). — 2026-07-31
+- **6. 규칙 힌트 하이브리드** (docudog/rule_hints.py, rule_settings). — 2026-07-31
+- **16. 유사·맥락 문서 후보** (docudog/related_docs.py, related_paths/last_related). — 2026-07-31
+- **7. 처리 이벤트 로그** (docudog/activity.py, DocuDog_activity_log.md, paths.activity_log_path): [classify]/[skip_*]/[audit]/[status] append-only. — 2026-07-31
+- **9. 보안 등급 라벨** (security_level_labels, docudog/security_labels.py): 리포트/audit에 매우 민감 (P1) 형태 + backend 의존 경고 문구. — 2026-07-31
+- **10. 미분류 사각지대 경고** (docudog/skip_insights.py): 파일명 민감 키워드·state.ops 집계, 리포트 배너 + status 경고. — 2026-07-31
+- **15. 산출물 에이전트 스펙** ([docs/docudog-output-spec.md](docs/docudog-output-spec.md)): AGENTS.md(개발)와 분리된 산출물 소비 가이드. — 2026-07-31
+- **20. 현황 대시보드** (docudog/status_dashboard.py, DocuDog_status.md(+html)): lineage=보관 / status=일상 진입점. — 2026-07-31
 - **1. 워처 없이 단일 파일 분류 스모크** (`tools/classify_one.py`, `docudog/single_file.py`, `python main.py --file PATH`): IDLE·큐 없이 추출→분류→stdout + `classification_report.md` 한 행. — 2026-06-04
 - **2. 회귀용 최소 문서 픽스처** (`fixtures/` 3종, `fixtures/README.md`, `tools/regression_smoke.py`: 첫 분류 → hash 스킵 → 수정 후 재분류). — 2026-06-04
 - **3. 분류 1회 실행 후 종료 모드** (`python main.py --once`, `DOCUDOG_RUN_ONCE=1`: 큐에서 한 건 처리 후 종료; `skip_idle_wait_for_testing`과 조합 가능). — 2026-06-04

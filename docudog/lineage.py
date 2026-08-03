@@ -339,74 +339,123 @@ def build_lineage_markdown(state: dict[str, Any], cfg: dict[str, Any] | None = N
             "",
         ]
         _append_context_bundles_section(lines0, state, cfg)
+        _append_semantic_changes_section(lines0, state, cfg)
         return "\n".join(lines0)
 
     multi, singletons, sim_note = _build_multi_groups(rows, cfg)
+    ls0 = (cfg or {}).get("lineage_settings") or {}
+    include_mermaid = bool(ls0.get("include_mermaid", False))
+    include_singleton_list = bool(ls0.get("include_singleton_list", False))
+    slim_intro = bool(ls0.get("slim_intro", True))
 
-    lines: list[str] = [
-        "# DocuDog — Document lineage map",
-        "",
-        "Virtual **Shadow Git–style** lineage (no `.git` folder): related files are clustered from "
-        "**local state** only (path, SHA-256, tags, summary).",
-        "",
-        "- **Filename key**: strip Windows `(1)`, `(2)`, `- copy`, `복사본`, then group identical keys.",
-        "- **Similarity** (`lineage_settings.clustering` = `both` default, or `similarity`): same extension; "
-        "stem similarity after stripping `_v1` / `_최종` / `_수정`-style tails (`difflib`); if both sides have "
-        "a **summary**, blend in **token Jaccard** overlap. Tune `similarity_threshold` / weights in config.",
-        "",
-        "Open in VS Code (or GitHub) to render **Mermaid**. Optional LLM one-liners: "
-        "`lineage_settings.llm_cluster_hints`.",
-        "",
-        f"Updated: {_format_report_timestamp(datetime.now(timezone.utc))}",
-        "",
-        f"- Tracked files with hash: **{len(rows)}**",
-        f"- Multi-file lineage groups: **{len(multi)}**",
-        f"- Single-file components (not merged): **{singletons}**",
-    ]
+    if slim_intro:
+        lines: list[str] = [
+            "# DocuDog — Document lineage map",
+            "",
+            "_보관·상세 맵 (일상 현황은 `DocuDog_status.md`). "
+            "Mermaid/싱글톤 목록은 `lineage_settings.include_mermaid` / "
+            "`include_singleton_list`._",
+            "",
+            f"Updated: {_format_report_timestamp(datetime.now(timezone.utc))}",
+            "",
+            f"- Tracked files with hash: **{len(rows)}**",
+            f"- Multi-file lineage groups: **{len(multi)}**",
+            f"- Single-file components (not listed by default): **{singletons}**",
+        ]
+    else:
+        lines = [
+            "# DocuDog — Document lineage map",
+            "",
+            "Virtual **Shadow Git–style** lineage (no `.git` folder): related files are clustered from "
+            "**local state** only (path, SHA-256, tags, summary).",
+            "",
+            "- **Filename key**: strip Windows `(1)`, `(2)`, `- copy`, `복사본`, then group identical keys.",
+            "- **Similarity** (`lineage_settings.clustering` = `both` default, or `similarity`): same extension; "
+            "stem similarity after stripping `_v1` / `_최종` / `_수정`-style tails (`difflib`); if both sides have "
+            "a **summary**, blend in **token Jaccard** overlap. Tune `similarity_threshold` / weights in config.",
+            "",
+            "Open in VS Code (or GitHub) to render **Mermaid**. Optional LLM one-liners: "
+            "`lineage_settings.llm_cluster_hints`.",
+            "",
+            f"Updated: {_format_report_timestamp(datetime.now(timezone.utc))}",
+            "",
+            f"- Tracked files with hash: **{len(rows)}**",
+            f"- Multi-file lineage groups: **{len(multi)}**",
+            f"- Single-file components (not merged): **{singletons}**",
+        ]
     if sim_note:
         lines.append(f"- Clustering: _{mermaid_safe(sim_note, 160)}_")
     lines.append("")
 
-    mermaid_lines: list[str] = [
-        "```mermaid",
-        "flowchart TB",
-    ]
-    node_i = 0
+    if include_mermaid:
+        mermaid_lines: list[str] = [
+            "```mermaid",
+            "flowchart TB",
+        ]
+        node_i = 0
 
-    for g_idx, (_gkey, members) in enumerate(multi, start=1):
-        members_sorted = _sort_members_lineage(list(members))
-        unique_hashes = {str(m[1].get("sha256", "")) for m in members_sorted}
-        dup_note = "same content" if len(unique_hashes) == 1 else f"{len(unique_hashes)} content variants"
-        label0 = os.path.basename(members_sorted[0][0])
-        sg_title = mermaid_safe(f"G{g_idx}: {label0} ({len(members_sorted)} files, {dup_note})")
-        mermaid_lines.append(f"    subgraph g{g_idx}[\"{sg_title}\"]")
+        for g_idx, (_gkey, members) in enumerate(multi, start=1):
+            members_sorted = _sort_members_lineage(list(members))
+            unique_hashes = {str(m[1].get("sha256", "")) for m in members_sorted}
+            dup_note = (
+                "same content"
+                if len(unique_hashes) == 1
+                else f"{len(unique_hashes)} content variants"
+            )
+            label0 = os.path.basename(members_sorted[0][0])
+            sg_title = mermaid_safe(
+                f"G{g_idx}: {label0} ({len(members_sorted)} files, {dup_note})"
+            )
+            mermaid_lines.append(f"    subgraph g{g_idx}[\"{sg_title}\"]")
 
-        node_ids: list[str] = []
-        for path, meta in members_sorted:
-            nid = f"n{node_i}"
-            node_i += 1
-            node_ids.append(nid)
-            bn = mermaid_safe(os.path.basename(path), 60)
-            sha = _sha_prefix(str(meta.get("sha256", "")))
-            mermaid_lines.append(f"        {nid}[\"{bn}<br/>sha {sha}…\"]")
+            node_ids: list[str] = []
+            for path, meta in members_sorted:
+                nid = f"n{node_i}"
+                node_i += 1
+                node_ids.append(nid)
+                bn = mermaid_safe(os.path.basename(path), 60)
+                sha = _sha_prefix(str(meta.get("sha256", "")))
+                mermaid_lines.append(f"        {nid}[\"{bn}<br/>sha {sha}…\"]")
 
-        for i in range(len(node_ids) - 1):
-            a, b = node_ids[i], node_ids[i + 1]
-            same = members_sorted[i][1].get("sha256") == members_sorted[i + 1][1].get("sha256")
-            link = "---" if same else "-.->"
-            mermaid_lines.append(f"        {a} {link} {b}")
+            for i in range(len(node_ids) - 1):
+                a, b = node_ids[i], node_ids[i + 1]
+                same = members_sorted[i][1].get("sha256") == members_sorted[i + 1][1].get(
+                    "sha256"
+                )
+                link = "---" if same else "-.->"
+                mermaid_lines.append(f"        {a} {link} {b}")
 
-        mermaid_lines.append("    end")
+            mermaid_lines.append("    end")
 
-    if node_i > 0:
-        mermaid_lines.append("```")
-        mermaid_lines.append("")
-        lines.append("## Lineage graph (multi-file groups)")
-        lines.append("")
-        lines.extend(mermaid_lines)
+        if node_i > 0:
+            mermaid_lines.append("```")
+            mermaid_lines.append("")
+            lines.append("## Lineage graph (multi-file groups)")
+            lines.append("")
+            lines.extend(mermaid_lines)
+        else:
+            lines.append(
+                "_No multi-file lineage groups yet — duplicate-style names will appear here._"
+            )
+            lines.append("")
     else:
-        lines.append("_No multi-file lineage groups yet — duplicate-style names will appear here._")
+        lines.append("_Mermaid graph omitted (`lineage_settings.include_mermaid`: false)._")
         lines.append("")
+
+    if include_singleton_list and singletons:
+        multi_paths = {p for _k, mem in multi for p, _m in mem}
+        singles = [(p, m) for p, m in rows if p not in multi_paths]
+        if singles:
+            lines.append("## Singleton files (optional list)")
+            lines.append("")
+            for path, meta in sorted(singles, key=lambda pm: pm[0].lower())[:80]:
+                lines.append(
+                    f"- `{mermaid_safe(os.path.basename(path), 120)}` · "
+                    f"{mermaid_safe(str(meta.get('security_level', '')), 12)}"
+                )
+            if len(singles) > 80:
+                lines.append(f"- _… +{len(singles) - 80} more_")
+            lines.append("")
 
     lines.append("## Detail tables")
     lines.append("")
@@ -458,7 +507,34 @@ def build_lineage_markdown(state: dict[str, Any], cfg: dict[str, Any] | None = N
                     lines.append("")
 
     _append_context_bundles_section(lines, state, cfg)
+    _append_semantic_changes_section(lines, state, cfg)
     return "\n".join(lines)
+
+
+def _append_semantic_changes_section(
+    lines: list[str],
+    state: dict[str, Any],
+    cfg: dict[str, Any] | None,
+) -> None:
+    ls = (cfg or {}).get("semantic_settings") if isinstance(cfg, dict) else {}
+    if isinstance(ls, dict) and ls.get("lineage_section") is False:
+        return
+    from . import semantic_diff
+
+    rows = semantic_diff.recent_changes_from_state(state, limit=20)
+    if not rows:
+        return
+    lines.append("## Semantic change log")
+    lines.append("")
+    lines.append("_Hash 변경 시 한 줄 요약 (`summary_history` / `last_change_summary`)._")
+    lines.append("")
+    for r in rows:
+        bn = mermaid_safe(os.path.basename(str(r.get("path") or "")), 100)
+        lines.append(
+            f"- `{bn}` ({mermaid_safe(str(r.get('utc') or '')[:19], 24)}): "
+            f"{mermaid_safe(str(r.get('change_summary') or ''), 200)}"
+        )
+    lines.append("")
 
 
 def write_lineage_map(
@@ -486,3 +562,16 @@ def regenerate_if_enabled(cfg: dict[str, Any], state: dict[str, Any], report_pat
     else:
         out = os.path.join(os.path.dirname(os.path.normpath(report_path)), "DocuDog_lineage.md")
     write_lineage_map(out, state, cfg)
+    act = cfg.get("activity_settings")
+    if isinstance(act, dict) and bool(act.get("log_lineage", False)):
+        try:
+            from . import activity
+
+            activity.append_activity(
+                cfg,
+                report_path,
+                "lineage",
+                f"regenerated {out}",
+            )
+        except Exception:
+            logger.exception("Activity log [lineage] failed")

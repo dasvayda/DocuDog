@@ -184,6 +184,13 @@ def _validate_and_normalize_classification(d: dict[str, Any]) -> dict[str, Any]:
     if not summ:
         raise ValueError("summary must be non-empty")
     out["summary"] = summ
+    # optional business category fields (validated loosely; router resolves against catalog)
+    if "category_id" in out and out.get("category_id") is not None:
+        out["category_id"] = str(out.get("category_id") or "").strip()
+    if "category_ids" in out and isinstance(out.get("category_ids"), list):
+        out["category_ids"] = [
+            str(x).strip() for x in out["category_ids"] if str(x).strip()
+        ]
     return out
 
 
@@ -208,9 +215,12 @@ def _classification_from_llm_raw(raw_text: str) -> dict[str, Any]:
     return _validate_and_normalize_classification(_extract_json_object(raw_text))
 
 
-def _build_prompt(document_text: str) -> str:
+def _build_prompt(document_text: str, *, rule_hint: str = "") -> str:
     # LiteRT-LM 일부 번들은 프리필 상한이 매우 작다(예: 512 토큰). 지시문은 영문 짧게 유지.
-    return SYSTEM_INSTRUCTION + "\n\n---\n" + document_text
+    base = SYSTEM_INSTRUCTION
+    if rule_hint.strip():
+        base = base + "\n\n" + rule_hint.strip()
+    return base + "\n\n---\n" + document_text
 
 
 AUDIT_HANDLING_SYSTEM = (
@@ -1255,6 +1265,7 @@ def _classify_document_openai_http(
     model_cfg: dict[str, Any],
     source_tag: str,
     should_yield: Optional[Callable[[], bool]],
+    rule_hint: str = "",
 ) -> dict[str, Any]:
     lm_cfg = _coerce_http_section(model_cfg, source_tag)
     base_url = str(lm_cfg.get("base_url") or "").strip()
@@ -1280,11 +1291,17 @@ def _classify_document_openai_http(
     temperature = _lm_studio_temperature(lm_cfg)
     max_tokens = _lm_studio_classify_max_tokens(model_cfg, lm_cfg)
 
+    system = SYSTEM_INSTRUCTION + " " + LM_STUDIO_JSON_VISIBLE_INSTRUCTION
+    if (rule_hint or "").strip():
+        system = (
+            SYSTEM_INSTRUCTION
+            + "\n"
+            + rule_hint.strip()
+            + " "
+            + LM_STUDIO_JSON_VISIBLE_INSTRUCTION
+        )
     messages: list[dict[str, str]] = [
-        {
-            "role": "system",
-            "content": SYSTEM_INSTRUCTION + " " + LM_STUDIO_JSON_VISIBLE_INSTRUCTION,
-        },
+        {"role": "system", "content": system},
         {"role": "user", "content": clipped},
     ]
 
@@ -1344,10 +1361,7 @@ def _classify_document_openai_http(
             + "\n\nOutput valid JSON only. security_level: P1, P2, P3, or P4 only."
         )
         retry_messages: list[dict[str, str]] = [
-            {
-                "role": "system",
-                "content": SYSTEM_INSTRUCTION + " " + LM_STUDIO_JSON_VISIBLE_INSTRUCTION,
-            },
+            {"role": "system", "content": system},
             {"role": "user", "content": retry_user},
         ]
         try:
@@ -1403,12 +1417,15 @@ def classify_document(
     document_text: str,
     config: dict[str, Any],
     should_yield: Optional[Callable[[], bool]] = None,
+    rule_hint: str = "",
 ) -> dict[str, Any]:
     """
     Classify document text into tags / security_level / summary.
 
     should_yield: if provided and returns True, streaming inference stops and
     raises YieldToUser (cooperative yield when the user is active again).
+
+    rule_hint: optional local rule block appended to the classify prompt.
 
     반환 dict에 DOCUDOG_META_* 키가 포함될 수 있음 — router에서 제거할 것.
     """
@@ -1422,6 +1439,7 @@ def classify_document(
         if cap_raw is not None and str(cap_raw).strip() != "":
             max_chars = min(max_chars, max(64, int(cap_raw)))
     clipped = document_text[:max_chars]
+    rh = (rule_hint or "").strip()
 
     if use_mock:
         logger.debug("Using mock inference (use_mock=true)")
@@ -1435,7 +1453,7 @@ def classify_document(
 
     if backend in ("lm_studio", "openai", "openai_compatible"):
         return _classify_document_openai_http(
-            clipped, model_cfg, backend, should_yield
+            clipped, model_cfg, backend, should_yield, rule_hint=rh
         )
 
     bundle_raw = (model_cfg.get("litert_lm_bundle_path") or "").strip()
@@ -1456,7 +1474,7 @@ def classify_document(
         _warn_mock_when_lite_expected(f"litert_lm import failed: {e}")
         return _with_inference_meta(mock_inference(clipped), "mock", "import_error")
 
-    prompt = _build_prompt(clipped)
+    prompt = _build_prompt(clipped, rule_hint=rh)
     max_gen = _litert_max_output_tokens(model_cfg)
 
     try:
@@ -1498,7 +1516,7 @@ def classify_document(
             _litert_debug_hint(),
         )
         retry_prompt = (
-            _build_prompt(clipped)
+            _build_prompt(clipped, rule_hint=rh)
             + "\n\nOutput valid JSON only. security_level: P1, P2, P3, or P4 only."
         )
         try:

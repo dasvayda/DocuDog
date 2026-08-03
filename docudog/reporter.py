@@ -314,13 +314,18 @@ def append_classification(
     inference_source: str = "mock",
     inference_reason: str = "",
     owner_tags_applied: bool = False,
+    config: dict | None = None,
+    state: dict | None = None,
 ) -> None:
     """Append one markdown table row to the report (creates file + header if needed)."""
+    from .security_labels import format_security_level
+
     path = _expand(report_path)
 
     tags_joined = ", ".join(tags)
     time_str = _format_report_timestamp(analyzed_at_utc)
     summary_one_line = _sanitize_cell(summary.replace("\r\n", "\n").replace("\n", " / "))
+    sec_display = format_security_level(security_level, config)
     infer_real = inference_source in _REAL_BACKEND_SOURCES
 
     use_infer_col = _report_has_inference_column(path)
@@ -341,21 +346,23 @@ def append_classification(
     if use_infer_col:
         row = (
             f"| {time_str} | {_sanitize_cell(file_name)} | `{file_hash}` | "
-            f"{_sanitize_cell(tags_joined)} | {_sanitize_cell(security_level)} | {_sanitize_cell(infer_cell)} | "
+            f"{_sanitize_cell(tags_joined)} | {_sanitize_cell(sec_display)} | {_sanitize_cell(infer_cell)} | "
             f"{summary_one_line} |\n"
         )
         header = (
             "# DocuDog classification report\n\n"
-            "로컬 누적 감사 로그. **Inference** 열: `lite_rt` = LiteRT-LM, "
+            "로컬 누적 감사 로그. **Security** 열: 사람용 라벨 + `(P1)`~`(P4)`. "
+            "**Inference** 열: `lite_rt` = LiteRT-LM, "
             "`lm_studio` / `openai_compatible` = 로컬/원격 chat API, "
-            "`mock` = 모의 결과. `+ owner` = `DocuDog_tag_overrides.json` 적용.\n\n"
+            "`mock` = 모의 결과. `+ owner` = `DocuDog_tag_overrides.json` 적용. "
+            "등급은 모델 판단이라 backend에 따라 흔들릴 수 있음.\n\n"
             "| Analyzed At (local) | File | SHA-256 | Tags | Security | Inference | Summary |\n"
             "|---|---|---|---|---|---|---|\n"
         )
     else:
         row = (
             f"| {time_str} | {_sanitize_cell(file_name)} | `{file_hash}` | "
-            f"{_sanitize_cell(tags_joined)} | {_sanitize_cell(security_level)} | {summary_one_line} |\n"
+            f"{_sanitize_cell(tags_joined)} | {_sanitize_cell(sec_display)} | {summary_one_line} |\n"
         )
         header = (
             "# DocuDog classification report\n\n"
@@ -370,10 +377,13 @@ def append_classification(
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         is_new = not os.path.isfile(path)
         if is_new:
+            body = header + row + footer
+            if state is not None:
+                from . import skip_insights
+
+                body = skip_insights.upsert_report_banner(body, state)
             with open(path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(header)
-                f.write(row)
-                f.write(footer)
+                f.write(body)
         else:
             try:
                 with open(path, encoding="utf-8") as f:
@@ -390,10 +400,34 @@ def append_classification(
                     new_body = new_body.rstrip() + "\n\n" + trailing
                 if not new_body.endswith("\n"):
                     new_body += "\n"
+                if state is not None:
+                    from . import skip_insights
+
+                    new_body = skip_insights.upsert_report_banner(new_body, state)
                 with open(path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(new_body)
         sync_report_html(path)
     logger.debug("Appended report row for %s", file_name)
+
+
+def refresh_report_banner(report_path: str, state: dict) -> None:
+    """Rewrite blind-spot banner in an existing report (best-effort)."""
+    from . import skip_insights
+
+    path = _expand(report_path)
+    if not os.path.isfile(path):
+        return
+    with _write_lock:
+        try:
+            with open(path, encoding="utf-8") as f:
+                body = f.read()
+            new_body = skip_insights.upsert_report_banner(body, state)
+            if new_body != body:
+                with open(path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(new_body)
+                sync_report_html(path)
+        except OSError as e:
+            logger.warning("Report banner refresh failed (%s): %s", path, e)
 
 
 def append_note(report_path: str, message: str) -> None:

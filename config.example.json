@@ -1,7 +1,10 @@
 {
   "watch_settings": {
     "target_directories": ["%USERPROFILE%/Documents/DocuDog_Watch"],
-    "exclude_directories": ["node_modules", ".git", "AppData"]
+    "exclude_directories": ["node_modules", ".git", "AppData"],
+    "event_dedupe_seconds": 2.0,
+    "file_open_retries": 3,
+    "file_open_retry_seconds": 0.4
   },
   "file_filters": {
     "allowed_extensions": [".txt", ".md", ".docx", ".xlsx", ".pptx", ".pdf"],
@@ -12,7 +15,10 @@
   },
   "idle_settings": {
     "idle_trigger_seconds": 120,
-    "skip_idle_wait_for_testing": false
+    "skip_idle_wait_for_testing": false,
+    "min_battery_percent": null,
+    "require_charging": false,
+    "defer_on_thermal_throttle": false
   },
   "runtime_settings": {
     "debug_python_logs": false
@@ -21,8 +27,88 @@
     "state_path": "%USERPROFILE%/Documents/DocuDog_state.json",
     "report_path": "%USERPROFILE%/Documents/classification_report.md",
     "audit_log_path": "",
+    "activity_log_path": "",
+    "status_path": "",
+    "mobile_digest_path": "",
+    "last_classify_path": "",
+    "categories_path": "",
     "tag_overrides_path": "",
     "run_lock_path": ""
+  },
+  "category_settings": {
+    "enabled": false,
+    "mode": "single",
+    "sample_excerpt_chars": 280
+  },
+  "semantic_settings": {
+    "enabled": true,
+    "llm_change_summary": false,
+    "history_max": 8,
+    "delta_max_chars": 900,
+    "lineage_section": true
+  },
+  "mobile_digest_settings": {
+    "enabled": true
+  },
+  "cadence_settings": {
+    "enabled": false,
+    "rules": [
+      {
+        "id": "weekly_report",
+        "label": "주간보고",
+        "pattern": "주간보고_*.docx",
+        "cadence": "weekly",
+        "due_weekday": 4
+      }
+    ]
+  },
+  "security_level_labels": {
+    "P1": "매우 민감",
+    "P2": "민감",
+    "P3": "내부",
+    "P4": "일반"
+  },
+  "activity_settings": {
+    "enabled": true,
+    "log_lineage": false
+  },
+  "status_settings": {
+    "enabled": true
+  },
+  "skip_insight_settings": {
+    "sensitive_filename_keywords": [
+      "주민등록",
+      "졸업증명",
+      "계약서",
+      "이력서",
+      "여권",
+      "통장",
+      "급여",
+      "연봉",
+      "신분증",
+      "가족관계",
+      "개인정보",
+      "사업자등록",
+      "인감",
+      "계좌"
+    ]
+  },
+  "rule_settings": {
+    "enabled": false,
+    "rules": [
+      {
+        "id": "rrn_like",
+        "pattern": "\\b\\d{6}[- ]?\\d{7}\\b",
+        "min_security_level": "P1",
+        "hint": "Possible resident-ID pattern"
+      },
+      {
+        "id": "contract_kw",
+        "keywords": ["계약서", "NDA", "비밀유지"],
+        "min_security_level": "P2",
+        "hint": "Contract / NDA keywords"
+      }
+    ]
   },
   "lineage_settings": {
     "enabled": true,
@@ -35,6 +121,9 @@
     "llm_cluster_hints": false,
     "llm_max_hint_groups": 8,
     "llm_hint_max_tokens": 384,
+    "include_mermaid": false,
+    "include_singleton_list": false,
+    "slim_intro": true,
     "context_bundles_enabled": true,
     "context_bundle_window_minutes": 30,
     "context_bundle_same_folder_only": false,

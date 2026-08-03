@@ -10,11 +10,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import activity
 from . import audit
+from . import categories
 from . import context_bundles
 from . import inference
+from . import last_classify
 from . import owner_tags
+from . import paths_util
+from . import power_gate
+from . import related_docs
 from . import reporter
+from . import rule_hints
+from . import semantic_diff
+from . import skip_insights
+from . import status_dashboard
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +32,7 @@ _SKIPPABLE_FOR_MVP = {".pdf", ".hwp", ".hwpx"}
 
 
 def _normalize_path(path: str) -> str:
-    return os.path.normpath(os.path.abspath(path))
+    return paths_util.normalize_fs_path(path)
 
 
 def passes_file_filters(config: dict[str, Any], path: str) -> bool:
@@ -41,15 +51,22 @@ def passes_file_filters(config: dict[str, Any], path: str) -> bool:
     return min_b <= sz <= max_b
 
 
-def sha256_file(path: str, chunk_size: int = 1024 * 1024) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
-            h.update(chunk)
-    return h.hexdigest()
+def sha256_file(
+    path: str,
+    chunk_size: int = 1024 * 1024,
+    cfg: dict[str, Any] | None = None,
+) -> str:
+    def _once() -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+
+    return paths_util.with_file_retry(cfg, f"sha256:{path}", _once)
 
 
 def _read_plain_text(path: str) -> str:
@@ -105,7 +122,10 @@ def _read_xlsx(path: str) -> str:
     return "\n".join(lines)
 
 
-def extract_document_text(path: str) -> tuple[str | None, str | None]:
+def extract_document_text(
+    path: str,
+    cfg: dict[str, Any] | None = None,
+) -> tuple[str | None, str | None]:
     """
     Return (text, skip_reason). skip_reason is set when routing should stop
     without treating as an error (e.g., MVP skips PDF/HWP).
@@ -114,7 +134,7 @@ def extract_document_text(path: str) -> tuple[str | None, str | None]:
     if ext in _SKIPPABLE_FOR_MVP:
         return None, f"MVP 스킵: 이 확장자는 텍스트 추출 미구현 ({ext})"
 
-    try:
+    def _once() -> tuple[str | None, str | None]:
         if ext in {".txt", ".md"}:
             return _read_plain_text(path), None
         if ext == ".docx":
@@ -123,12 +143,14 @@ def extract_document_text(path: str) -> tuple[str | None, str | None]:
             return _read_pptx(path), None
         if ext == ".xlsx":
             return _read_xlsx(path), None
+        return None, f"지원되지 않는 확장자: {ext}"
+
+    try:
+        return paths_util.with_file_retry(cfg, f"extract:{path}", _once)
     except Exception as e:
         logger.debug("텍스트 추출 실패: %s — %s", path, e)
         logger.debug("Extract traceback", exc_info=True)
         return None, f"텍스트 추출 실패: {e}"
-
-    return None, f"지원되지 않는 확장자: {ext}"
 
 
 def _utc_now_iso() -> str:
@@ -155,6 +177,7 @@ def process_file(
     Returns:
         None — finished handling (including filters/skips and successful analysis).
         "requeue" — same path should be enqueued again (user active / yielded).
+        "requeue_power" — power/battery gate; requeue and pause drain briefly.
 
     Yield / pause: if the user becomes active during streaming inference, we stop
     without writing partial results; caller should requeue the path.
@@ -164,18 +187,43 @@ def process_file(
 
     if not passes_file_filters(config, norm):
         logger.debug("Skip (filter): %s", norm)
+        activity.append_activity(config, report_path, "skip_filter", norm)
         return None
 
-    text, skip_reason = extract_document_text(norm)
+    text, skip_reason = extract_document_text(norm, config)
     if skip_reason:
         logger.debug("Skip: %s — %s", norm, skip_reason)
-        reporter.append_note(report_path, f"{skip_reason} — `{norm}`")
+        insight = skip_insights.record_extract_skip(state, config, norm, skip_reason)
+        save_state()
+        note = f"{skip_reason} — `{norm}`"
+        if insight.get("sensitive_keyword"):
+            note = (
+                f"민감 파일명 키워드({insight['sensitive_keyword']}) · {note}"
+            )
+        reporter.append_note(report_path, note)
+        reporter.refresh_report_banner(report_path, state)
+        activity.append_activity(
+            config,
+            report_path,
+            "skip_extract",
+            f"{norm} | {skip_reason}"
+            + (
+                f" | sensitive={insight['sensitive_keyword']}"
+                if insight.get("sensitive_keyword")
+                else ""
+            ),
+        )
+        try:
+            status_dashboard.write_status(config, state, report_path, save_state)
+        except Exception:
+            logger.exception("Status dashboard update failed after skip")
         return None
     if not (text and text.strip()):
         logger.debug("Skip (empty text): %s", norm)
+        activity.append_activity(config, report_path, "skip_empty", norm)
         return None
 
-    digest = sha256_file(norm)
+    digest = sha256_file(norm, cfg=config)
     prev = files_state.get(norm)
 
     if isinstance(prev, dict) and prev.get("sha256") == digest:
@@ -183,6 +231,7 @@ def process_file(
         files_state[norm] = prev
         save_state()
         logger.debug("Skip LLM (unchanged content hash): %s", norm)
+        activity.append_activity(config, report_path, "skip_hash", norm)
         return None
 
     def user_active() -> bool:
@@ -190,16 +239,41 @@ def process_file(
 
     if user_active():
         logger.info("Defer (user active before inference): %s", norm)
+        activity.append_activity(config, report_path, "defer_active", norm)
         return "requeue"
+
+    rule_hits = rule_hints.match_rules(text, config)
+    hint_parts: list[str] = []
+    rb = rule_hints.prompt_hint_block(rule_hits)
+    if rb:
+        hint_parts.append(rb)
+    cats_doc = categories.load_categories(config, state_path)
+    cb = categories.prompt_block(cats_doc, config)
+    if cb:
+        hint_parts.append(cb)
+    rule_block = "\n\n".join(hint_parts)
+
+    power_ok, power_reason = power_gate.inference_power_allowed(config)
+    if not power_ok:
+        logger.info("Defer (power gate): %s — %s", norm, power_reason)
+        activity.append_activity(
+            config,
+            report_path,
+            "defer_power",
+            f"{norm} | {power_reason}",
+        )
+        return "requeue_power"
 
     try:
         result = inference.classify_document(
             text,
             config,
             should_yield=user_active,
+            rule_hint=rule_block,
         )
     except inference.YieldToUser:
         logger.info("Yielded during inference (user active): %s", norm)
+        activity.append_activity(config, report_path, "defer_yield", norm)
         return "requeue"
 
     inf_src = str(result.pop(inference.DOCUDOG_META_SOURCE, "mock"))
@@ -217,6 +291,49 @@ def process_file(
     tags, sec, owner_applied = owner_tags.merge_owner_tags(
         norm, model_tags, model_sec, overrides_doc
     )
+    floor_applied: str | None = None
+    if not owner_applied:
+        sec, floor_applied = rule_hints.apply_security_floor(sec, rule_hits)
+        if floor_applied:
+            note = f"rule_floor={floor_applied}"
+            inf_reason = f"{inf_reason}; {note}".strip("; ") if inf_reason else note
+
+    category_ids, cat_needs_review = categories.resolve_from_result(
+        result, cats_doc, config
+    )
+    # strip category keys from result leftovers (already used)
+    result.pop("category_id", None)
+    result.pop("category_ids", None)
+    report_tags = list(tags)
+    if category_ids:
+        labels = [
+            categories.label_for(c, cats_doc) for c in category_ids if c != "uncategorized"
+        ]
+        if labels:
+            report_tags = [f"[{', '.join(labels)}]"] + list(tags)
+        elif "uncategorized" in category_ids:
+            report_tags = ["[uncategorized]"] + list(tags)
+        if cat_needs_review:
+            note = "category_needs_review"
+            inf_reason = f"{inf_reason}; {note}".strip("; ") if inf_reason else note
+
+    change_line = ""
+    if (
+        semantic_diff.semantic_enabled(config)
+        and isinstance(prev, dict)
+        and prev.get("sha256")
+        and prev.get("sha256") != digest
+    ):
+        try:
+            change_line = semantic_diff.build_change_line(
+                str(prev.get("summary") or ""),
+                summary,
+                "",  # previous full text not retained; summary-driven
+                text[:2000],
+                config,
+            )
+        except Exception:
+            logger.debug("semantic change line failed", exc_info=True)
 
     analyzed_at = datetime.now(timezone.utc)
     reporter.append_classification(
@@ -224,12 +341,14 @@ def process_file(
         analyzed_at_utc=analyzed_at,
         file_name=os.path.basename(norm),
         file_hash=digest,
-        tags=tags,
+        tags=report_tags,
         security_level=sec,
         summary=summary,
         inference_source=inf_src,
         inference_reason=inf_reason,
         owner_tags_applied=owner_applied,
+        config=config,
+        state=state,
     )
 
     excerpt_lim = 1200
@@ -263,10 +382,69 @@ def process_file(
         "owner_override": owner_applied,
         "inference_source": inf_src,
         "inference_reason": inf_reason,
+        "rule_hits": [h.get("id") for h in rule_hits],
+        "rule_floor": floor_applied or "",
+        "category_ids": category_ids,
+        "category_needs_review": cat_needs_review,
     }
+    if isinstance(prev, dict) and isinstance(prev.get("summary_history"), list):
+        files_state[norm]["summary_history"] = list(prev["summary_history"])
+    if semantic_diff.semantic_enabled(config):
+        sset = config.get("semantic_settings")
+        max_h = 8
+        if isinstance(sset, dict) and sset.get("history_max") is not None:
+            try:
+                max_h = int(sset["history_max"])
+            except (TypeError, ValueError):
+                max_h = 8
+        semantic_diff.push_summary_history(
+            files_state[norm],
+            sha256=digest,
+            summary=summary,
+            utc=analyzed_at.isoformat(),
+            change_summary=change_line,
+            max_entries=max_h,
+        )
+    # related candidates (same key / summary / context bundles)
+    related = related_docs.find_related_paths(state, norm, files_state[norm])
+    if related:
+        files_state[norm]["related_paths"] = related
+        state["last_related"] = {
+            "anchor": norm,
+            "paths": related,
+            "utc": analyzed_at.isoformat(),
+        }
     state["last_inference_backend"] = inf_src
     state["last_inference_utc"] = analyzed_at.isoformat()
     save_state()
+    act_msg = f"{norm} | {sec} | {inf_src}"
+    if category_ids:
+        act_msg += f" | cat={','.join(category_ids)}"
+    if change_line:
+        act_msg += f" | change={change_line[:80]}"
+    activity.append_activity(
+        config,
+        report_path,
+        "classify",
+        act_msg,
+        when=analyzed_at,
+    )
+    try:
+        last_classify.write_last_classify(
+            config,
+            report_path,
+            path=norm,
+            security_level=sec,
+            tags=list(tags) if isinstance(tags, list) else [str(tags)],
+            summary=summary,
+            inference_source=inf_src,
+            file_hash=digest,
+            when=analyzed_at,
+            category_ids=category_ids,
+            change_summary=change_line,
+        )
+    except Exception:
+        logger.exception("last_classify write failed for %s", norm)
     logger.info(
         "Analyzed: %s [inference=%s]",
         os.path.basename(norm),
@@ -280,4 +458,8 @@ def process_file(
             )
         except Exception:
             logger.exception("Context bundle update failed for %s", norm)
+    try:
+        status_dashboard.write_status(config, state, report_path, save_state)
+    except Exception:
+        logger.exception("Status dashboard update failed for %s", norm)
     return None

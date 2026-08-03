@@ -16,6 +16,8 @@ from typing import Any, Iterable
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
+from . import paths_util
+
 logger = logging.getLogger(__name__)
 
 _non_windows_idle_warning_emitted = False
@@ -93,6 +95,8 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
         min_bytes: int,
         max_bytes: int,
         on_seen: Callable[[str, float], None] | None = None,
+        *,
+        dedupe_seconds: float = 2.0,
     ) -> None:
         super().__init__()
         self._file_queue = file_queue
@@ -101,21 +105,35 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
         self._min_bytes = min_bytes
         self._max_bytes = max_bytes
         self._on_seen = on_seen
+        self._dedupe_seconds = max(0.0, float(dedupe_seconds))
+        self._recent: dict[str, float] = {}
 
     def _maybe_enqueue(self, src_path: str | bytes | None) -> None:
         if not src_path or isinstance(src_path, bytes):
             return
         try:
-            normalized = os.path.normpath(os.path.abspath(src_path))
+            normalized = paths_util.normalize_fs_path(src_path)
         except OSError:
             return
         if _path_matches_exclude(normalized, self._exclude_directories):
             return
         if not os.path.isfile(normalized):
             return
-        if not _passes_quick_filter(normalized, self._allowed_extensions, self._min_bytes, self._max_bytes):
+        if not _passes_quick_filter(
+            normalized, self._allowed_extensions, self._min_bytes, self._max_bytes
+        ):
             return
         t = time.time()
+        if self._dedupe_seconds > 0:
+            last = self._recent.get(normalized)
+            if last is not None and (t - last) < self._dedupe_seconds:
+                logger.debug("Dedupe skip (recent event): %s", normalized)
+                return
+            self._recent[normalized] = t
+            # prune occasionally
+            if len(self._recent) > 4000:
+                cutoff = t - max(60.0, self._dedupe_seconds * 10)
+                self._recent = {k: v for k, v in self._recent.items() if v >= cutoff}
         if self._on_seen is not None:
             self._on_seen(normalized, t)
         self._file_queue.put((normalized, t))
@@ -133,13 +151,19 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
 
 
 def expand_watch_dirs(config: dict[str, Any]) -> list[str]:
-    """Return absolute watch roots from config (expandvars + exists check)."""
+    """Return absolute watch roots from config (expandvars + UNC-safe normalize)."""
     watch = config.get("watch_settings", {})
     raw_dirs: list[str] = watch.get("target_directories", [])
     out: list[str] = []
     for d in raw_dirs:
-        expanded = os.path.normpath(os.path.expandvars(d))
+        expanded = paths_util.normalize_fs_path(str(d))
         out.append(expanded)
+        if paths_util.is_unc_path(expanded):
+            logger.info(
+                "UNC/NAS watch root configured: %s "
+                "(single state/report; concurrent writers may hit sharing locks — retries apply)",
+                expanded,
+            )
     return out
 
 
@@ -156,16 +180,25 @@ def start_observer(
     size = filters.get("size_limit", {})
     min_b = int(size.get("min_bytes", 0))
     max_b = int(size.get("max_bytes", 2**62))
+    try:
+        dedupe = float(watch.get("event_dedupe_seconds", 2.0))
+    except (TypeError, ValueError):
+        dedupe = 2.0
 
-    handler = _DocuDogWatchHandler(file_queue, exclude, exts, min_b, max_b, on_seen)
+    handler = _DocuDogWatchHandler(
+        file_queue, exclude, exts, min_b, max_b, on_seen, dedupe_seconds=dedupe
+    )
     observer = Observer()
 
     for root in expand_watch_dirs(config):
         if not os.path.isdir(root):
             logger.warning("Watch directory missing (will not observe): %s", root)
             continue
-        observer.schedule(handler, root, recursive=True)
-        logger.debug("Watching recursively: %s", root)
+        try:
+            observer.schedule(handler, root, recursive=True)
+            logger.debug("Watching recursively: %s", root)
+        except Exception as e:
+            logger.warning("Failed to schedule watch on %s: %s", root, e)
 
     observer.start()
     return observer
@@ -203,7 +236,7 @@ def seed_queue_from_existing_files(
             for name in filenames:
                 full = os.path.join(dirpath, name)
                 try:
-                    norm = os.path.normpath(os.path.abspath(full))
+                    norm = paths_util.normalize_fs_path(full)
                 except OSError:
                     continue
                 if _path_matches_exclude(norm, exclude):

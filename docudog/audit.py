@@ -10,6 +10,7 @@ from typing import Any
 
 from . import inference
 from .reporter import _format_report_timestamp, _sanitize_cell
+from .security_labels import format_security_level
 
 logger = logging.getLogger(__name__)
 _write_lock = threading.Lock()
@@ -36,21 +37,24 @@ def append_audit_row(
     tags: list[str],
     handling_note: str,
     inference_source: str,
+    config: dict[str, Any] | None = None,
 ) -> None:
     path = os.path.normpath(os.path.expandvars(audit_path))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     time_str = _format_report_timestamp(analyzed_at_utc)
     tags_joined = ", ".join(tags)
     note_cell = handling_note.replace("\r\n", "\n").replace("\n", " / ")
+    level_cell = format_security_level(security_level, config)
     row = (
         f"| {time_str} | {_sanitize_cell(file_name)} | `{file_hash}` | "
-        f"{_sanitize_cell(security_level)} | {_sanitize_cell(tags_joined)} | "
+        f"{_sanitize_cell(level_cell)} | {_sanitize_cell(tags_joined)} | "
         f"{_sanitize_cell(inference_source)} | {_sanitize_cell(note_cell)} |\n"
     )
     header = (
         "# DocuDog audit log (P1/P2)\n\n"
         "로컬 감사 전용. **P1**·**P2** 분류 시 한 행이 추가됩니다. "
-        "네트워크 전송 없음.\n\n"
+        "네트워크 전송 없음. 액션 요약은 `DocuDog_status.md`의 "
+        "「지금 할 일」을 본다.\n\n"
         "| At (local) | File | SHA-256 | Level | Tags | Inference | Handling hint |\n"
         "|---|---|---|---|---|---|---|\n"
     )
@@ -98,4 +102,17 @@ def maybe_record_sensitive_classification(
         tags=tags,
         handling_note=handling,
         inference_source=inference_source,
+        config=cfg,
     )
+    try:
+        from . import activity
+
+        activity.append_activity(
+            cfg,
+            report_path,
+            "audit",
+            f"{norm_path} | {security_level}",
+            when=analyzed_at_utc,
+        )
+    except Exception:
+        logger.exception("Activity log [audit] failed")

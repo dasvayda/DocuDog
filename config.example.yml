@@ -53,15 +53,22 @@ model:
 # lineage_settings:
 #   clustering: both   # filename_key | similarity | both
 #   similarity_threshold: 0.58
-#   filename_weight: 0.55
-#   summary_weight: 0.45
-#   max_files_for_similarity: 400
-#   llm_cluster_hints: true
-#   llm_max_hint_groups: 6
-#   # Time-window file co-occurrence (optional; DocuDog_lineage.md section)
-#   context_bundles_enabled: false
-#   context_bundle_window_minutes: 30
-#   context_bundle_same_folder_only: false
-#   context_bundle_extra_directories: []   # e.g. ["%USERPROFILE%/Downloads"]
-#   context_bundle_max_bundles: 60
-#   context_bundle_max_event_buffer: 800
+#   include_mermaid: false          # archive slim default
+#   include_singleton_list: false
+#   slim_intro: true
+#
+# idle_settings power gate (Windows laptop):
+#   min_battery_percent: 30
+#   require_charging: false
+#
+# cadence_settings:
+#   enabled: true
+#   rules:
+#     - id: weekly_report
+#       label: 주간보고
+#       pattern: "주간보고_*.docx"
+#       cadence: weekly
+#
+# paths:
+#   mobile_digest_path: ""   # default: DocuDog_mobile_digest.html next to report
+#   last_classify_path: ""   # default: DocuDog_last_classify.json

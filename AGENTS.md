@@ -20,9 +20,15 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Lineage | `docudog/lineage.py` | Mermaid map + optional `llm_cluster_hints`; **similarity** clustering (`clustering`, Jaccard+difflib) |
 | Audit | `docudog/audit.py` | P1/P2 append-only `DocuDog_audit_log.md` + optional LLM handling hint |
 | Owner tags | `docudog/owner_tags.py`, `DocuDog_tag_overrides.json`, `tools/sync_tag_overrides.py` | **No web UI** — local JSON; guide [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md) |
+| Categories | `docudog/categories.py`, `DocuDog_categories.json` | Owner taxonomy + few-shot prompt (`category_settings`) |
+| Semantic log | `docudog/semantic_diff.py` | `summary_history` / optional LLM one-line change |
+| Paths/UNC | `docudog/paths_util.py` | UNC-safe normalize, file open retries |
+| Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
+| Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); lineage stays archive |
+| Output spec (readers) | [docs/docudog-output-spec.md](docs/docudog-output-spec.md) | How agents/scripts consume local artifacts (not this repo's `AGENTS.md`) |
 | Config | `docudog/config_loader.py`, `main.load_config()`, `config.json` | Defaults + YAML overlay (`config.yml` / `config.yaml`): watch roots, filters, paths, `model.*`, `audit_settings`, `lineage_settings` |
 
-**Paths in config:** prefer forward slashes (`%USERPROFILE%/Documents/...`) so values paste cleanly from Explorer; Windows accepts them and `os.path.normpath` normalizes. `state_path` / `report_path` (and set `audit_log_path`) parent folders are created at startup if missing. Watch roots (`target_directories`) are **not** auto-created.
+**Paths in config:** prefer forward slashes (`%USERPROFILE%/Documents/...`) so values paste cleanly from Explorer; Windows accepts them and `os.path.normpath` / `paths_util.normalize_fs_path` normalizes. UNC roots (`\\server\share\...`) are supported for watch; sharing locks retry via `watch_settings.file_open_retries`. `state_path` / `report_path` (and set `audit_log_path`) parent folders are created at startup if missing. Watch roots (`target_directories`) are **not** auto-created. Single state/report instance — concurrent NAS writers are serialized by the daemon queue.
 
 ## Conventions
 

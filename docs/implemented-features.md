@@ -20,6 +20,10 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-05-19 | Context bundles(시간 윈도우 공동 출현): `lineage_settings` 키, `state.context_bundles`, lineage Markdown 섹션 |
 | 2026-06-04 | 단일 파일 스모크(`classify_one`, `main --file`), `--once`/`DOCUDOG_RUN_ONCE`, `fixtures/` + `regression_smoke.py` |
 | 2026-07-22 | 분류 리포트 HTML 동기화(`classification_report.html`, MD와 동일 basename) |
+| 2026-07-31 | activity log · 등급 라벨 · 미분류 경고 · `DocuDog_status` · `docs/docudog-output-spec.md` |
+| 2026-07-31 | #11 액션 다이제스트 · #8 lint_governance · #19 search_corpus · #6 rule_hints · #16 related_docs |
+| 2026-07-31 | #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify |
+| 2026-07-31 | #17 categories · #4 semantic_history · #5 UNC/retry |
 
 ---
 
@@ -42,6 +46,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 추론 런타임 요약 로그 | 백엔드·번들/URL·모델 ID 등 | `docudog/inference.log_inference_runtime_summary` |
 | 시작 시 모델 프로브 | 설정에 따라 LiteRT 또는 HTTP 짧은 호출 | `docudog/inference.startup_model_probe` |
 | 유휴 루프 | 사용자 입력 유휴 후 큐 처리; 설정·환경변수로 유휴 시간 조정 | `main.py`, `docudog/watcher.sleep_while_busy` 등 |
+| 전력 게이트 | `idle_settings.min_battery_percent` / `require_charging` — 추론 직전 defer, activity `[defer_power]` | `docudog/power_gate.py`, `docudog/router` |
+| 주기 문서 cadence | `cadence_settings.rules` — 주/월 부재 감지 → status·digest·`[cadence_miss]` | `docudog/cadence.py` |
 | 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
 
 ---
@@ -74,7 +80,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 기능 | 설명 | 모듈 |
 |------|------|------|
 | 백엔드 선택 | `enable_litert_lm` / `enable_lm_studio` 토글 및 `inference_preference`; 레거시 `model.backend` 문자열 | `docudog/inference._normalize_backend` |
-| 분류 출력 | JSON: `tags`, `security_level`(형식만 `P1`–`P4` 검증), `summary` — **등급 의미 판별은 규칙 엔진 없이 모델 출력에 의존** | `docudog/inference.classify_document`, `docudog/inference._validate_and_normalize_classification` |
+| 분류 출력 | JSON: `tags`, `security_level`(형식만 `P1`–`P4` 검증), `summary`; 선택 `rule_settings` 힌트·등급 floor | `docudog/inference.classify_document`, `docudog/rule_hints` |
 | LiteRT 프리필 완화 | `litert_classify_context_cap`, `litert_aux_max_user_chars` 등 | `docudog/inference` |
 | HTTP 백엔드 | OpenAI 호환 `POST /v1/chat/completions`; LM Studio 등 | `docudog/inference._openai_http_chat_completion` |
 | Mock | `use_mock`, 번들/URL 미설정, 백엔드 비활성 등 | `docudog/inference.mock_inference` 등 |
@@ -82,6 +88,9 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | Lineage LLM 힌트 | 다중 파일 그룹 관계 한 줄 요약(옵션) | `docudog/inference.lineage_cluster_hints_batch`, `docudog/lineage.py` |
 | Lineage 유사도 그룹 | `clustering`=`both` 등: stem 정규화 + difflib + summary Jaccard, union-find | `docudog/lineage._build_multi_groups` |
 | Context bundles | 분류 직후 앵커 파일의 FS 이벤트 시각 ±N분·같은 폴더(또는 `context_bundle_extra_directories`) 내 다른 경로를 `state.context_bundles`에 누적; `DocuDog_lineage.md` 표(옵션) | `docudog/context_bundles.py`, `docudog/router.process_file`, `docudog/lineage._append_context_bundles_section` |
+| 업무 카테고리 | `DocuDog_categories.json` + `category_settings` — 프롬프트 선택지, `state.category_ids` | `docudog/categories.py` |
+| 시맨틱 변경 | hash 변경 시 `summary_history` / `last_change_summary` (선택 LLM) | `docudog/semantic_diff.py` |
+| UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
 
 ---
 
@@ -91,9 +100,15 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 |--------|------|------|
 | `classification_report.md` | 분류 행 append; Inference 열(구 리포트 호환); 말미 `_Last inference: ..._` 메타(HTML 주석 블록으로 치환) | `docudog/reporter.py` |
 | `classification_report.html` | MD와 **동일 basename**; 분류/노트 append 및 시작 시 MD에서 동기화(브라우저 열람용) | `docudog/reporter.sync_report_html` |
-| `DocuDog_state.json` | 파일별 해시·메타; 최상위 `last_inference_backend`, `last_inference_utc`; 선택 `context_bundles` | `main.load_state` / `docudog/router` |
+| `DocuDog_activity_log.md` | 운영 타임라인 append (`[classify]`/`[skip_*]`/`[audit]` 등) | `docudog/activity.py` |
+| `DocuDog_status.md` (+html) | 현황 대시보드(짧게): 액션 다이제스트·오늘 분류·P1/P2·미분류 경고·등급/backend 분포·최신본 Top·유사 후보 | `docudog/status_dashboard.py`, `action_digest.py` |
+| 규칙 힌트 하이브리드 | `rule_settings` 키워드/정규식 → 프롬프트 힌트 + 등급 floor (`rule_floor`) | `docudog/rule_hints.py`, `router` |
+| 유사·맥락 후보 | 분류 후 `related_paths` / `last_related` (lineage key·요약 Jaccard·context bundle) | `docudog/related_docs.py` |
+| `DocuDog_state.json` | 파일별 해시·메타; 최상위 `last_inference_backend`, `last_inference_utc`; 선택 `context_bundles`; `ops` 스킵 집계 | `main.load_state` / `docudog/router` |
 | `DocuDog_audit_log.md` | **P1·P2**일 때만 append; 선택적 handling 힌트 열 | `docudog/audit.py` |
-| `DocuDog_lineage.md` | 옵션; 파일명·해시 기반 lineage 및 Mermaid; 선택 **Context bundles** 섹션 | `docudog/lineage.py` |
+| `DocuDog_lineage.md` | 옵션; 파일명·해시 기반 lineage; Mermaid는 `include_mermaid`(기본 off); 선택 **Context bundles** | `docudog/lineage.py` |
+| `DocuDog_mobile_digest.html`(+`.json`) | status 축소판 (오늘/P1·P2/액션/cadence) | `docudog/mobile_digest.py` |
+| `DocuDog_last_classify.json` | 최근 분류 1건 (Share companion) | `docudog/last_classify.py` |
 | 스킵/메모 | `reporter.append_note` — 리포트에 인용 블록 형태 메모 | `docudog/reporter.py` |
 
 ---
@@ -107,6 +122,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `regression_smoke.py` | `fixtures/` 복사본으로 분류→hash 스킵→수정→재분류 (mock) |
 | `sync_tag_overrides.py` | 오버라이드 JSON을 state에 재반영(재추론 없음) |
 | `batch_eval.py`, `benchmark_inference.py`, `quick_test.py` | 평가·벤치·스모크 — 저장소 루트를 `sys.path`에 넣고 `from docudog import ...` |
+| `lint_governance.py` | state/audit 경량 린트 → `DocuDog_lint_report.md` (원본 파일 미수정) |
+| `search_corpus.py` | state 메타 검색 CLI (`--level`/`--tag`/`--query`) |
 
 ---
 

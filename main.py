@@ -14,8 +14,18 @@ import warnings
 from typing import Any
 
 import psutil
-from docudog import context_bundles, inference, lineage, reporter, router, single_file, watcher
+from docudog import (
+    context_bundles,
+    inference,
+    lineage,
+    reporter,
+    router,
+    single_file,
+    status_dashboard,
+    watcher,
+)
 from docudog.config_loader import load_app_config, resolve_http_api_key
+from docudog import activity as activity_mod
 
 logger = logging.getLogger(__name__)
 
@@ -449,6 +459,21 @@ def main() -> None:
             os.path.normpath(os.path.expandvars(audit_raw)),
             label="audit_log_path",
         )
+    activity_path = activity_mod.resolve_activity_log_path(cfg, report_path)
+    _ensure_parent_dir(activity_path, label="activity_log_path")
+    status_path = status_dashboard.resolve_status_path(cfg, report_path)
+    _ensure_parent_dir(status_path, label="status_path")
+    from docudog import last_classify as last_classify_mod
+    from docudog import mobile_digest as mobile_digest_mod
+
+    _ensure_parent_dir(
+        last_classify_mod.resolve_last_classify_path(cfg, report_path),
+        label="last_classify_path",
+    )
+    _ensure_parent_dir(
+        mobile_digest_mod.resolve_mobile_digest_path(cfg, report_path),
+        label="mobile_digest_path",
+    )
     if os.path.isfile(report_path):
         html_out = reporter.sync_report_html(report_path)
         if html_out:
@@ -503,6 +528,15 @@ def main() -> None:
             lineage.regenerate_if_enabled(cfg, state, report_path)
         except Exception:
             logger.exception("Lineage map initial write failed")
+        try:
+            sp = status_dashboard.write_status(cfg, state, report_path, persist)
+            if sp:
+                logger.info("Status dashboard: %s", sp)
+                activity_mod.append_activity(
+                    cfg, report_path, "status", f"wrote {sp}"
+                )
+        except Exception:
+            logger.exception("Status dashboard initial write failed")
 
         file_queue: queue.Queue[tuple[str, float]] = queue.Queue()
         obs = watcher.start_observer(cfg, file_queue, on_seen=on_fs_event_seen)
@@ -593,6 +627,14 @@ def main() -> None:
                             file_event_unix=file_event_unix,
                             get_fs_event_snapshot=fs_event_snapshot,
                         )
+                        if outcome == "requeue_power":
+                            file_queue.put((next_path, file_event_unix))
+                            logger.info(
+                                "Power gate deferred inference; pausing drain (%s)",
+                                next_path,
+                            )
+                            time.sleep(20.0)
+                            break
                         if outcome == "requeue":
                             file_queue.put((next_path, file_event_unix))
                             if run_once:
