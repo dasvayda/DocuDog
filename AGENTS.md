@@ -23,6 +23,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Categories | `docudog/categories.py`, `DocuDog_categories.json` | Owner taxonomy + few-shot prompt (`category_settings`) |
 | Semantic log | `docudog/semantic_diff.py` | `summary_history` / optional LLM one-line change |
 | Paths/UNC | `docudog/paths_util.py` | UNC-safe normalize, file open retries |
+| MCP | `tools/docudog_mcp.py`, `docudog/mcp_service.py` | Read-only corpus tools for Cursor/Claude; [docs/mcp-connect.md](docs/mcp-connect.md) |
 | Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
 | Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); lineage stays archive |
 | Output spec (readers) | [docs/docudog-output-spec.md](docs/docudog-output-spec.md) | How agents/scripts consume local artifacts (not this repo's `AGENTS.md`) |

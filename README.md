@@ -23,7 +23,18 @@ Windows 로컬 PC에서 문서를 조용히 감시하고, **유휴(idle) 시간*
 | 산출물 | 분류 리포트, state JSON, P1/P2 감사 로그, 문서 lineage(Mermaid) |
 | 미구현 | 웹 UI, 서버 RAG, PDF/HWP 본문 추출, 커널/이메일 DLP |
 
-상세 기능 목록: [docs/implemented-features.md](docs/implemented-features.md) · 아키텍처: [ARCHITECTURE.md](ARCHITECTURE.md)
+상세 기능 목록: [docs/implemented-features.md](docs/implemented-features.md) · 아키텍처: [ARCHITECTURE.md](ARCHITECTURE.md) · MCP 연결: [docs/mcp-connect.md](docs/mcp-connect.md)
+
+## MCP (Cursor / Claude)
+
+로컬 분류 결과를 다른 AI에 **다시 첨부하지 않고** 쓰려면:
+
+```bash
+pip install -r requirements.txt
+python tools/docudog_mcp.py --write-cursor-mcp
+```
+
+Claude Desktop 등은 `python tools/docudog_mcp.py --print-install` JSON을 설정에 합친다. 도구: `docudog_search`, `docudog_status`, `docudog_get` 등 (읽기 전용).
 
 ## 요구 사항
 

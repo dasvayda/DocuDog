@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "docudog": {
+      "command": "python",
+      "args": [
+        "tools/docudog_mcp.py",
+        "--config-dir",
+        "."
+      ],
+      "cwd": "."
+    }
+  }
+}

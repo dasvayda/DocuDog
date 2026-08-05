@@ -12,3 +12,7 @@ litert-lm>=0.11.0
 
 # Download gated .litertlm from Hugging Face (optional): pip install "huggingface_hub[cli]"
 huggingface_hub>=0.26.0
+
+# MCP server (Cursor / Claude Desktop): python tools/docudog_mcp.py
+# Prefer: pip install --user "mcp[cli]"
+mcp[cli]>=1.2.0

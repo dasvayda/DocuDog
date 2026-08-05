@@ -47,6 +47,12 @@
     "delta_max_chars": 900,
     "lineage_section": true
   },
+  "mcp_settings": {
+    "enforce_allowlist": true,
+    "extra_allow_directories": [],
+    "max_security_level_for_excerpt": "P4",
+    "max_excerpt_chars": 1200
+  },
   "mobile_digest_settings": {
     "enabled": true
   },

@@ -32,3 +32,6 @@ DocuDog_tag_overrides.json
 
 # Reference subtree (not part of shipped MVP)
 reference/
+
+# Machine-local Cursor MCP (absolute paths from --write-cursor-mcp)
+.cursor/mcp.json

@@ -13,6 +13,8 @@
 
 ### 대기 (Next)
 
+> **2026-08-05 MCP:** #21 DocuDog MCP 1차 (`tools/docudog_mcp.py`, [docs/mcp-connect.md](docs/mcp-connect.md)). 「MCP로 연결」→ `--write-cursor-mcp` / `--print-install`.
+
 > **2026-07-31(4) 추가 완료:** #17 categories · #4 semantic_history · #5 UNC/retry.
 
 > **2026-07-31(3) 추가 완료:** #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify.
@@ -157,6 +159,19 @@ Bento는 로컬 우선 단일 파일 오피스 앱(슬라이드 편집기 + CRDT
 
 - **20b. (후속) lineage 보관본 경량화** — status가 안정된 뒤: 기본 Mermaid off, 싱글톤 목록 생략/별도, 상세 표는 다중 그룹만 등. 데이터 손실 없이 “안 읽히는 분량”만 줄임.
 
+**목표(외부 AI · Cowork 연동, 2026-08-05):** Claude Cowork·프로젝트 지식·폴더 지정은 **첨부 순간의 스냅샷**이라, 감시 폴더에 새 파일·수정이 생겨도 대화 쪽이 자동으로 안다거나 다시 안 붙여도 되는 구조가 **아님**. DocuDog은 이미 그 공백을 **로컬에서** 메우고 있음 — 분류·등급·요약·lineage·유사 후보·status/activity. 다음 단계는 “클라우드에 문서 전체 올리고 동기화”가 아니라, **이미 있는 산출물을 MCP로 읽게** 해서 Cursor/Claude Desktop 등 **여러 MCP 클라이언트**가 새 문서·프로젝트를 쓸 때 DocuDog 메타를 **질의**하게 하는 것. (#15 `docs/docudog-output-spec.md`, #19 `search_corpus`가 전제.)
+
+- **21. DocuDog MCP 서버 (읽기 전용 · 산출물 브리지)**  
+  **상황·문제:** 로컬 문서를 AI에 쓰려면 파일/폴더를 **매번 첨부·재지정**해야 하고, 변경분이 **자동 반영되지 않음**. “AI에게 알려 주기”도 사람이 기억에 의존.  
+  **원안 냉정 평가:** “로컬 문서를 Claude에 연결해 Cowork 등에서 쓰자”는 방향은 맞음. 다만 (1) Cowork 폴더 동기화 API를 DocuDog이 대체·해킹하는 제품은 범위 밖·취약, (2) 전체 원문 인덱스를 MCP로 열어 두면 **P1/P2·감사 목적과 충돌**, (3) 보류 C의 자연어 위키 Q&A·벡터 RAG와 겹치면 Stage 1 정체성이 흐려짐.  
+  **DocuDog화(쓸 만한 형태):** **stdio MCP 서버** 하나 — DocuDog **daemon과 프로세스 분리**(watcher는 그대로). 도구는 **기존 state/리포트/CLI 로직 래핑**만. 클라이언트가 “이 주제 관련 로컬 문서 있나?”, “방금 분류된 파일·유사본”, “오늘 할 일/cadence miss”, “이 파일 등급·요약·변경 한 줄”을 **질의** → 응답은 메타(+선택·짧은 excerpt). 새 초안/기획을 쓸 때 **참고 경로·등급·요약**을 붙이는 용도.  
+  **연결 DX (필수):** 사용자가 Claude/Cursor에 **「DocuDog을 MCP로 연결해줘」**만 말해도 에이전트가 따라 할 수 있게 — `python tools/docudog_mcp.py --write-cursor-mcp` / `--print-install`, [docs/mcp-connect.md](docs/mcp-connect.md), `.cursor/rules/docudog-mcp-connect.mdc`.  
+  **1차 도구:** `docudog_ping` · `docudog_status` · `docudog_search` · `docudog_get` · `docudog_last_classify` · `docudog_recent_changes` · `docudog_related`.  
+  **보안:** 읽기 전용, allowlist, `max_security_level_for_excerpt`(기본 P4).  
+  **구현:** `docudog/mcp_service.py`, `tools/docudog_mcp.py`. — **코드 1차 완료 2026-08-05** (클라이언트에서 ping 검증은 설치 후).
+
+- **21b. (후속) MCP Resources · 컨텍스트 팩** — 도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환해 새 문서 초안 프롬프트에 붙이기 쉽게. 1차는 #21 도구만으로도 가치 검증 가능하면 보류 유지.
+
 ### 보류 (Deferred)
 
 나중에 구현 검토. **모델 A/B 비교·벤치** 용도는 MVP 본류가 아니므로 여기 보관합니다.
@@ -167,7 +182,7 @@ Bento는 로컬 우선 단일 파일 오피스 앱(슬라이드 편집기 + CRDT
   | 아이디어 | 왜 Stage 1 아님 |
   |----------|-----------------|
   | `DocuDog_index.md` 카탈로그 | `classification_report.md` + `DocuDog_state.json`과 **중복**; “위키 목차”가 아니라 리포트가 이미 산출물 |
-  | `tools/query_docs.py` (자연어 Q&A) | **질의형 PKM**; DocuDog은 사용자 질의 없이 **백그라운드 분류**. RAG Graph는 로드맵이지만 서버/그래프 맥락 |
+  | `tools/query_docs.py` (자연어 Q&A) | **질의형 PKM**; DocuDog은 사용자 질의 없이 **백그라운드 분류**. RAG Graph는 로드맵이지만 서버/그래프 맥락. **외부 에이전트용 읽기 브리지는 #21 MCP**(위키 Q&A 제품 아님) |
   | `DocuDog_entities/*.md` 롤업 | **엔티티 위키**; DocuDog DNA는 **문서 버전 lineage**, Tolkien Gateway식 개념 페이지 아님 |
   | `tools/search_index.py` (BM25) | 로드맵 LanceDB/Chroma와 **같은 축**; watcher MVP 선행 과제 아님 |
   | 일반 full-text / “인기 문서” 피드 | OS 검색과 경쟁; **열람(open) 신호가 없어** 수정 횟수≠중요도. 인기는 shell/ETW 훅 또는 명시적 “핀”이 생긴 뒤 재검토 |
@@ -183,6 +198,7 @@ Bento는 로컬 우선 단일 파일 오피스 앱(슬라이드 편집기 + CRDT
 
 ### 완료 (Done)
 
+- **21. DocuDog MCP (1차)** (`tools/docudog_mcp.py`, `docudog/mcp_service.py`, [docs/mcp-connect.md](docs/mcp-connect.md), `--write-cursor-mcp` / `--print-install`): 읽기 전용 도구 + Cursor/Claude 연결 DX. — 2026-08-05
 - **17. 업무 카테고리 few-shot** (`docudog/categories.py`, `DocuDog_categories.example.json`, `category_settings`): 선택지 강제 → `state.category_ids` / 리포트 Tags 접두. — 2026-07-31
 - **4. 시맨틱 변경 로그** (`docudog/semantic_diff.py`): `summary_history` + `last_change_summary`(휴리스틱; 선택 LLM); status/lineage 섹션. — 2026-07-31
 - **5. UNC/NAS 감시 보강** (`paths_util`, watcher dedupe/retry, UNC 로그): 공유 잠금 재시도·이벤트 디듑·단일 state 정책 명시. — 2026-07-31

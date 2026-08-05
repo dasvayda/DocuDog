@@ -87,6 +87,11 @@ hash 변경 재분류 시 `summary_history[]`, `last_change_summary`. `llm_chang
 
 `watch_settings.file_open_retries` / `event_dedupe_seconds`. 경로는 UNC 유지. **단일** state/report 인스턴스 권장.
 
+## MCP (`tools/docudog_mcp.py`)
+
+외부 AI(Cursor/Claude Desktop)가 산출물을 **재첨부 없이** 질의. 연결: [mcp-connect.md](mcp-connect.md).  
+도구 ↔ 산출물: `docudog_search`/`get` → `DocuDog_state.json`; `docudog_status` → status/digest; `docudog_last_classify` → last_classify JSON.
+
 ## 규칙 힌트 (`rule_settings`)
 
 `enabled: true`일 때 키워드/정규식 매칭 → 분류 프롬프트 힌트 + 등급 floor(`state.files[].rule_floor`). owner override가 있으면 floor 미적용.

@@ -24,6 +24,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-07-31 | #11 액션 다이제스트 · #8 lint_governance · #19 search_corpus · #6 rule_hints · #16 related_docs |
 | 2026-07-31 | #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify |
 | 2026-07-31 | #17 categories · #4 semantic_history · #5 UNC/retry |
+| 2026-08-05 | #21 DocuDog MCP (`tools/docudog_mcp.py`, docs/mcp-connect.md) |
 
 ---
 
@@ -91,6 +92,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 업무 카테고리 | `DocuDog_categories.json` + `category_settings` — 프롬프트 선택지, `state.category_ids` | `docudog/categories.py` |
 | 시맨틱 변경 | hash 변경 시 `summary_history` / `last_change_summary` (선택 LLM) | `docudog/semantic_diff.py` |
 | UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
+| MCP 서버 | Cursor/Claude용 읽기 전용 도구; `--write-cursor-mcp` / `--print-install` | `tools/docudog_mcp.py`, `docudog/mcp_service.py`, [mcp-connect.md](mcp-connect.md) |
 
 ---
 

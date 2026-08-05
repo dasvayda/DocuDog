@@ -1,0 +1,17 @@
+---
+description: Connect DocuDog as an MCP server when the user asks
+globs:
+alwaysApply: false
+---
+
+# DocuDog MCP connect
+
+If the user asks to connect **DocuDog** via **MCP** (Claude, Cursor, Cowork, etc.):
+
+1. Read and follow [docs/mcp-connect.md](docs/mcp-connect.md).
+2. From the DocuDog repo root run:
+   - `pip install -r requirements.txt` (if `mcp` missing)
+   - `python tools/docudog_mcp.py --write-cursor-mcp` for Cursor
+   - or `python tools/docudog_mcp.py --print-install` and merge JSON for Claude Desktop
+3. Do **not** invent a custom MCP server or point at unrelated tools.
+4. After config write, tell the user to reload MCP / restart the chat, then verify with **`docudog_ping`**.
