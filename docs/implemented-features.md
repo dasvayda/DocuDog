@@ -25,6 +25,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-07-31 | #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify |
 | 2026-07-31 | #17 categories · #4 semantic_history · #5 UNC/retry |
 | 2026-08-05 | #21 DocuDog MCP (`tools/docudog_mcp.py`, docs/mcp-connect.md) |
+| 2026-08-13 | HWP/HWPX 본문 추출 (`docudog/extract_hwp.py`, `syhwp`); MVP 스킵은 PDF만 |
 
 ---
 
@@ -32,7 +33,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 - **포함**: 이 저장소의 Python MVP(Stage 1 Watcher) — 백그라운드 감시, 유휴 스케줄링, 추출·분류, 로컬 Markdown/JSON 산출.
 - **레이아웃**: 실행 진입점은 저장소 루트의 **`main.py`**; 그 외 코어 모듈은 **`docudog/`** 패키지(`docudog/inference.py` 등).
-- **제외**: `reference/whichllm` 등 **참조용 서브트리**의 기능은 본 목록에 넣지 않음(해당 README·문서 따름).
+- **제외**: `reference/hop`, `reference/whichllm` 등 **참조용 서브트리**의 기능은 본 목록에 넣지 않음(해당 README·문서 따름).
 
 ---
 
@@ -69,8 +70,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 기능 | 설명 | 모듈 |
 |------|------|------|
 | 확장자·크기 필터 | `file_filters` | `docudog/router.passes_file_filters` |
-| 추출 지원 형식 | `.txt`, `.md`, `.docx`, `.pptx`, `.xlsx` | `docudog/router.extract_document_text` |
-| MVP 스킵 | `.pdf`, `.hwp`, `.hwpx` 등 — 추출 없이 스킵 사유 기록 | `docudog/router` |
+| 추출 지원 형식 | `.txt`, `.md`, `.docx`, `.pptx`, `.xlsx`, `.hwp`, `.hwpx` | `docudog/router.extract_document_text`, `docudog/extract_hwp.py` |
+| MVP 스킵 | `.pdf` — 추출 없이 스킵 사유 기록 | `docudog/router` |
 | 중복·재분류 방지 | 파일 전체 SHA-256; 동일 해시면 LLM 생략·`last_checked_utc` 갱신 | `docudog/router.process_file` |
 | 소유자 오버라이드 | `DocuDog_tag_overrides.json`로 태그·`security_level` 우선 | `docudog/owner_tags.py` |
 
@@ -135,7 +136,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 - **보안 등급 P1–P4의 조직 정책 매핑** 또는 키워드·규칙 기반 자동 배정
 - **웹 UI** 또는 중앙 서버로의 자동 동기화(마스터 플랜의 서버 RAG·DLP **미구현**)
-- **PDF/HWP 본문 추출** (MVP 스킵)
+- **PDF 본문 추출** (MVP 스킵; HWP/HWPX는 `syhwp`로 추출)
 - **커널·이메일 후킹** 수준의 실시간 DLP 차단
 
 ---

@@ -14,6 +14,7 @@ from . import activity
 from . import audit
 from . import categories
 from . import context_bundles
+from . import extract_hwp
 from . import inference
 from . import last_classify
 from . import owner_tags
@@ -28,7 +29,7 @@ from . import status_dashboard
 
 logger = logging.getLogger(__name__)
 
-_SKIPPABLE_FOR_MVP = {".pdf", ".hwp", ".hwpx"}
+_SKIPPABLE_FOR_MVP = {".pdf"}
 
 
 def _normalize_path(path: str) -> str:
@@ -122,13 +123,17 @@ def _read_xlsx(path: str) -> str:
     return "\n".join(lines)
 
 
+def _read_hwp(path: str) -> str:
+    return extract_hwp.read_hwp_text(path)
+
+
 def extract_document_text(
     path: str,
     cfg: dict[str, Any] | None = None,
 ) -> tuple[str | None, str | None]:
     """
     Return (text, skip_reason). skip_reason is set when routing should stop
-    without treating as an error (e.g., MVP skips PDF/HWP).
+    without treating as an error (e.g., MVP skips PDF).
     """
     ext = Path(path).suffix.lower()
     if ext in _SKIPPABLE_FOR_MVP:
@@ -143,6 +148,11 @@ def extract_document_text(
             return _read_pptx(path), None
         if ext == ".xlsx":
             return _read_xlsx(path), None
+        if ext in {".hwp", ".hwpx"}:
+            try:
+                return _read_hwp(path), None
+            except extract_hwp.EncryptedHwpError as e:
+                return None, str(e)
         return None, f"지원되지 않는 확장자: {ext}"
 
     try:

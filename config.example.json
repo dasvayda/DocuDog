@@ -7,7 +7,7 @@
     "file_open_retry_seconds": 0.4
   },
   "file_filters": {
-    "allowed_extensions": [".txt", ".md", ".docx", ".xlsx", ".pptx", ".pdf"],
+    "allowed_extensions": [".txt", ".md", ".docx", ".xlsx", ".pptx", ".pdf", ".hwp", ".hwpx"],
     "size_limit": {
       "min_bytes": 1024,
       "max_bytes": 52428800

@@ -49,7 +49,7 @@ flowchart LR
 
 1. **`main.py`** — Loads `config.json`, expands paths, enforces run lock, applies background priority, runs `startup_model_probe`, starts observer, drains queue when user idle.
 2. **`docudog/watcher.py`** — Recursive watch under configured roots; startup directory scan enqueues eligible files; idle polling for processing windows.
-3. **`docudog/router.py`** — Extension/size filters, MVP skips (e.g. PDF/HWP without extractors), extracts text (txt/md/docx/pptx/xlsx), content-hash skip, appends report, updates state; invokes `docudog.inference`.
+3. **`docudog/router.py`** — Extension/size filters, MVP skip for PDF, extracts text (txt/md/docx/pptx/xlsx/hwp/hwpx), content-hash skip, appends report, updates state; invokes `docudog.inference`. HWP/HWPX uses `docudog/extract_hwp.py` (`syhwp`); `reference/hop` is not imported.
 4. **`docudog/inference.py`** — Builds classification prompt; opens LiteRT-LM engine with configured max output tokens; parses/validates JSON; retry on schema failure; exposes `LiteRTInferenceError.stage` for failure localization.
 5. **`docudog/env_litert.py`** — Sets TF/GLOG-related defaults before native load; **optional** stderr silencing via global `dup2` (`DOCUDOG_SILENCE_LITERT_STDERR=1`, **default off** — on some Windows + LiteRT builds, redirecting fd 2 breaks init/inference).
 6. **`docudog/reporter.py` / `docudog/lineage.py`** — Human-readable audit trail; lineage map with **filename-key and/or fuzzy clustering** (stem + summary overlap, union-find) plus optional LLM hints.

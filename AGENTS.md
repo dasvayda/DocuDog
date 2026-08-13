@@ -14,6 +14,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Entry | `main.py` (repo root) | Config/state, single-instance lock, idle loop, orchestration; imports **`docudog`** |
 | Watch | `docudog/watcher.py` | Windows idle (`GetLastInputInfo`), watchdog queues |
 | Route | `docudog/router.py` | Filters, hash dedupe, extract, call `inference`, reporter |
+| HWP | `docudog/extract_hwp.py` | `.hwp`/`.hwpx` text via **`syhwp`**; `reference/hop` is the desktop/rhwp format reference only |
 | LLM | `docudog/inference.py` | LiteRT-LM, LM Studio/OpenAI-compatible HTTP (`/v1/chat/completions`), mock |
 | LiteRT env | `docudog/env_litert.py` | Native log suppression, `apply_litert_env_defaults()` |
 | Report | `docudog/reporter.py` | Append rows to `classification_report.md` and sync sibling `classification_report.html` |

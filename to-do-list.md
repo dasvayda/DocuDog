@@ -198,6 +198,7 @@ Bento는 로컬 우선 단일 파일 오피스 앱(슬라이드 편집기 + CRDT
 
 ### 완료 (Done)
 
+- **HWP/HWPX 본문 추출** (`docudog/extract_hwp.py`, `syhwp`): hop/rhwp는 `reference/hop` 참조만; watcher가 `.hwp`/`.hwpx`를 분류 파이프에 태움. 암호화·배포용은 스킵. — 2026-08-13
 - **21. DocuDog MCP (1차)** (`tools/docudog_mcp.py`, `docudog/mcp_service.py`, [docs/mcp-connect.md](docs/mcp-connect.md), `--write-cursor-mcp` / `--print-install`): 읽기 전용 도구 + Cursor/Claude 연결 DX. — 2026-08-05
 - **17. 업무 카테고리 few-shot** (`docudog/categories.py`, `DocuDog_categories.example.json`, `category_settings`): 선택지 강제 → `state.category_ids` / 리포트 Tags 접두. — 2026-07-31
 - **4. 시맨틱 변경 로그** (`docudog/semantic_diff.py`): `summary_history` + `last_change_summary`(휴리스틱; 선택 LLM); status/lineage 섹션. — 2026-07-31
