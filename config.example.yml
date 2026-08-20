@@ -14,7 +14,8 @@
 # Put the secret in repo-root .env as OPENAI_API_KEY=... (preferred), or here as api_key.
 #
 # Paths: prefer forward slashes (Windows-friendly paste), e.g.
-#   paths.state_path: "%USERPROFILE%/Documents/DocuDog/DocuDog_state.json"
+#   paths.artifact_home: "%USERPROFILE%/.docudog"
+#   paths.state_path: "%USERPROFILE%/.docudog/DocuDog_state.json"
 # state/report parents are created at startup; watch target_directories are not.
 
 model:

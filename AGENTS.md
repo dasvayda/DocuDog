@@ -5,7 +5,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 ## Product snapshot
 
 - **Goal**: Background file watching + idle-aware scheduling, local document text extraction, **on-device LLM** classification (tags, P1–P4 security level, summary), append-only Markdown report and optional lineage output.
-- **MVP scope**: "Watcher" pipeline only: no UI, no server sync in code paths that ship today.
+- **MVP scope**: Watcher pipeline; optional tray launcher. No document-browser GUI, no server sync in code paths that ship today.
 - **User-facing feature map:** [Features.md](Features.md) (what to open, what you get). Module inventory: [docs/implemented-features.md](docs/implemented-features.md).
 
 ## Repository map (Python)
@@ -16,6 +16,9 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Watch | `docudog/watcher.py` | Windows idle (`GetLastInputInfo`), watchdog queues |
 | Route | `docudog/router.py` | Filters, hash dedupe, extract, call `inference`, reporter |
 | HWP | `docudog/extract_hwp.py` | `.hwp`/`.hwpx` text via **`syhwp`**; `reference/hop` is the desktop/rhwp format reference only |
+| PDF | `docudog/extract_pdf.py` | Text layer via **`pypdf`**; encrypted/empty (scan) skip |
+| Artifacts | `docudog/artifact_home.py` | Default `%USERPROFILE%/.docudog/`; copy-only migrate from `Documents/DocuDog/` |
+| Tray | `docudog/tray_app.py`, `notify.py` | Optional `--tray` / `--install-startup`; P1 toast |
 | LLM | `docudog/inference.py` | LiteRT-LM, LM Studio/OpenAI-compatible HTTP (`/v1/chat/completions`), mock |
 | LiteRT env | `docudog/env_litert.py` | Native log suppression, `apply_litert_env_defaults()` |
 | Report | `docudog/reporter.py` | Append rows to `classification_report.md` and sync sibling `classification_report.html` |
@@ -24,7 +27,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Audit | `docudog/audit.py` | P1/P2 append-only `DocuDog_audit_log.md` + optional LLM handling hint |
 | Owner tags | `docudog/owner_tags.py`, `DocuDog_tag_overrides.json`, `tools/sync_tag_overrides.py` | **No web UI** — local JSON; guide [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md) |
 | Categories | `docudog/categories.py`, `DocuDog_categories.json` | Owner taxonomy + few-shot prompt (`category_settings`) |
-| Semantic log | `docudog/semantic_diff.py` | `summary_history` / optional LLM one-line change |
+| Semantic log | `docudog/semantic_diff.py` | Same-path hash history + lineage peer one-liner |
 | Paths/UNC | `docudog/paths_util.py` | UNC-safe normalize, file open retries |
 | MCP | `tools/docudog_mcp.py`, `docudog/mcp_service.py` | Read-only corpus tools for Cursor/Claude; [docs/mcp-connect.md](docs/mcp-connect.md) |
 | Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
@@ -32,7 +35,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Output spec (readers) | [docs/docudog-output-spec.md](docs/docudog-output-spec.md) | How agents/scripts consume local artifacts (not this repo's `AGENTS.md`) |
 | Config | `docudog/config_loader.py`, `main.load_config()`, `config.json` | Defaults + YAML overlay (`config.yml` / `config.yaml`): watch roots, filters, paths, `model.*`, `audit_settings`, `lineage_settings` |
 
-**Paths in config:** prefer forward slashes (`%USERPROFILE%/Documents/...`) so values paste cleanly from Explorer; Windows accepts them and `os.path.normpath` / `paths_util.normalize_fs_path` normalizes. UNC roots (`\\server\share\...`) are supported for watch; sharing locks retry via `watch_settings.file_open_retries`. `state_path` / `report_path` (and set `audit_log_path`) parent folders are created at startup if missing. Watch roots (`target_directories`) are **not** auto-created. Single state/report instance — concurrent NAS writers are serialized by the daemon queue.
+**Paths in config:** default artifacts live in `%USERPROFILE%/.docudog/` (hidden), not the watch folder. Prefer forward slashes in YAML/JSON. Watch roots are **not** auto-created.
 
 ## Conventions
 

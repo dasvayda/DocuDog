@@ -24,8 +24,9 @@
     "debug_python_logs": false
   },
   "paths": {
-    "state_path": "%USERPROFILE%/Documents/DocuDog_state.json",
-    "report_path": "%USERPROFILE%/Documents/classification_report.md",
+    "artifact_home": "%USERPROFILE%/.docudog",
+    "state_path": "%USERPROFILE%/.docudog/DocuDog_state.json",
+    "report_path": "%USERPROFILE%/.docudog/classification_report.md",
     "audit_log_path": "",
     "activity_log_path": "",
     "status_path": "",
@@ -46,6 +47,9 @@
     "history_max": 8,
     "delta_max_chars": 900,
     "lineage_section": true
+  },
+  "notify_settings": {
+    "enabled": true
   },
   "mcp_settings": {
     "enforce_allowlist": true,

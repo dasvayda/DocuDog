@@ -15,6 +15,7 @@ from . import audit
 from . import categories
 from . import context_bundles
 from . import extract_hwp
+from . import extract_pdf
 from . import inference
 from . import last_classify
 from . import owner_tags
@@ -26,10 +27,12 @@ from . import rule_hints
 from . import semantic_diff
 from . import skip_insights
 from . import file_ids, status_dashboard
+from . import notify
+from . import runtime_pause
 
 logger = logging.getLogger(__name__)
 
-_SKIPPABLE_FOR_MVP = {".pdf"}
+_SKIPPABLE_FOR_MVP: set[str] = set()
 
 
 def _normalize_path(path: str) -> str:
@@ -153,6 +156,15 @@ def extract_document_text(
                 return _read_hwp(path), None
             except extract_hwp.EncryptedHwpError as e:
                 return None, str(e)
+        if ext == ".pdf":
+            try:
+                return extract_pdf.read_pdf_text(path), None
+            except extract_pdf.EncryptedPdfError as e:
+                return None, str(e)
+            except extract_pdf.EmptyPdfTextError as e:
+                return None, str(e)
+            except ValueError as e:
+                return None, str(e)
         return None, f"지원되지 않는 확장자: {ext}"
 
     try:
@@ -194,6 +206,11 @@ def process_file(
     """
     norm = _normalize_path(path)
     files_state: dict[str, Any] = state.setdefault("files", {})
+
+    if runtime_pause.is_paused():
+        logger.info("Defer (tray pause): %s", norm)
+        activity.append_activity(config, report_path, "defer_pause", norm)
+        return "requeue"
 
     if not passes_file_filters(config, norm):
         logger.debug("Skip (filter): %s", norm)
@@ -408,6 +425,13 @@ def process_file(
     }
     if isinstance(prev, dict) and isinstance(prev.get("summary_history"), list):
         files_state[norm]["summary_history"] = list(prev["summary_history"])
+    if semantic_diff.semantic_enabled(config) and not change_line:
+        try:
+            change_line = semantic_diff.lineage_peer_change_line(
+                config, state, norm, summary, text
+            )
+        except Exception:
+            logger.debug("lineage peer change line failed", exc_info=True)
     if semantic_diff.semantic_enabled(config):
         sset = config.get("semantic_settings")
         max_h = 8
@@ -448,6 +472,11 @@ def process_file(
         act_msg,
         when=analyzed_at,
     )
+    if str(sec).upper() == "P1":
+        try:
+            notify.maybe_p1_toast(config, os.path.basename(norm))
+        except Exception:
+            logger.debug("P1 toast failed", exc_info=True)
     try:
         last_classify.write_last_classify(
             config,

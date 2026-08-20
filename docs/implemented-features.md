@@ -26,7 +26,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-07-31 | #18 cadence · #13 power gate · #14 mobile digest · #20b lineage slim · #12 last_classify |
 | 2026-07-31 | #17 categories · #4 semantic_history · #5 UNC/retry |
 | 2026-08-05 | #21 DocuDog MCP (`tools/docudog_mcp.py`, docs/mcp-connect.md) |
-| 2026-08-18 | 문서 스레드 + `file_id` (`docudog/threads.py`, `file_ids.py`); MCP `docudog_thread` / `docudog_by_hash` |
+| 2026-08-20 | Pivot 1: `.docudog/` 산출물, PDF 텍스트 추출, MCP 1클릭(Claude)+lineage/bundle, 트레이/P1 토스트, 이종 파일 semantic diff |
 
 ---
 
@@ -52,6 +52,9 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 전력 게이트 | `idle_settings.min_battery_percent` / `require_charging` — 추론 직전 defer, activity `[defer_power]` | `docudog/power_gate.py`, `docudog/router` |
 | 주기 문서 cadence | `cadence_settings.rules` — 주/월 부재 감지 → status·digest·`[cadence_miss]` | `docudog/cadence.py` |
 | 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
+| 산출물 홈 | 기본 `%USERPROFILE%/.docudog/`; 예전 `Documents/DocuDog/` 복사 마이그레이션(삭제 없음) | `docudog/artifact_home.py` |
+| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·데이터 폴더. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
+| P1 토스트 | 신규 P1 분류 시 Windows 토스트 (`notify_settings.enabled`) | `docudog/notify.py` |
 
 ---
 
@@ -71,8 +74,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 기능 | 설명 | 모듈 |
 |------|------|------|
 | 확장자·크기 필터 | `file_filters` | `docudog/router.passes_file_filters` |
-| 추출 지원 형식 | `.txt`, `.md`, `.docx`, `.pptx`, `.xlsx`, `.hwp`, `.hwpx` | `docudog/router.extract_document_text`, `docudog/extract_hwp.py` |
-| MVP 스킵 | `.pdf` — 추출 없이 스킵 사유 기록 | `docudog/router` |
+| 추출 지원 형식 | `.txt` `.md` `.docx` `.pptx` `.xlsx` `.hwp` `.hwpx` `.pdf`(텍스트 레이어; 암호·빈 스캔은 스킵) | `docudog/router`, `extract_hwp`, `extract_pdf` |
 | 중복·재분류 방지 | 파일 전체 SHA-256; 동일 해시면 LLM 생략·`last_checked_utc` 갱신 | `docudog/router.process_file` |
 | 소유자 오버라이드 | `DocuDog_tag_overrides.json`로 태그·`security_level` 우선 | `docudog/owner_tags.py` |
 
@@ -94,9 +96,9 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 안정 file_id | state 파일 레코드 UUID; 동일 해시+사라진 경로 = rename 유지 | `docudog/file_ids.py`, `router.process_file` |
 | Context bundles | 분류 직후 앵커 파일의 FS 이벤트 시각 ±N분·같은 폴더(또는 `context_bundle_extra_directories`) 내 다른 경로를 `state.context_bundles`에 누적; `DocuDog_lineage.md` 표(옵션) | `docudog/context_bundles.py`, `docudog/router.process_file`, `docudog/lineage._append_context_bundles_section` |
 | 업무 카테고리 | `DocuDog_categories.json` + `category_settings` — 프롬프트 선택지, `state.category_ids` | `docudog/categories.py` |
-| 시맨틱 변경 | hash 변경 시 `summary_history` / `last_change_summary` (선택 LLM) | `docudog/semantic_diff.py` |
+| 시맨틱 변경 | 같은 path 해시 변경 + lineage 그룹 **이종 파일명** 직전 vs 최신 한 줄 | `docudog/semantic_diff.py` |
 | UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
-| MCP 서버 | 읽기 전용; `docudog_thread` / `docudog_by_hash`; get은 path 또는 file_id | `tools/docudog_mcp.py`, `docudog/mcp_service.py`, [mcp-connect.md](mcp-connect.md) |
+| MCP 서버 | 읽기 전용; lineage/bundle/search 날짜; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1` | `tools/docudog_mcp.py`, `docudog/mcp_service.py` |
 
 ---
 
@@ -130,6 +132,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `batch_eval.py`, `benchmark_inference.py`, `quick_test.py` | 평가·벤치·스모크 — 저장소 루트를 `sys.path`에 넣고 `from docudog import ...` |
 | `lint_governance.py` | state/audit 경량 린트 → `DocuDog_lint_report.md` (원본 파일 미수정) |
 | `test_threads.py` | file_id rename + version/conversation 스레드 스모크 |
+| `test_pdf_extract.py` | 빈 PDF skip + 텍스트 레이어 추출 스모크 |
+| `docudog_tray.py` | `main.py --tray` 래퍼 |
 
 ---
 
@@ -139,7 +143,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 - **보안 등급 P1–P4의 조직 정책 매핑** 또는 키워드·규칙 기반 자동 배정
 - **웹 UI** 또는 중앙 서버로의 자동 동기화(마스터 플랜의 서버 RAG·DLP **미구현**)
-- **PDF 본문 추출** (MVP 스킵; HWP/HWPX는 `syhwp`로 추출)
+- **스캔 PDF OCR** 또는 암호 PDF 본문 (텍스트 레이어만 추출)
+- **MCP SSE** (`localhost:8765`) — stdio만
 - **커널·이메일 후킹** 수준의 실시간 DLP 차단
 
 ---

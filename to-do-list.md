@@ -21,6 +21,8 @@
 
 ### 대기 (Next)
 
+> **2026-08-20 피봇 구현:** `260820-01`~`05` Done. 상세 [`.cursor/plans/pivot-1-260820.md`](.cursor/plans/pivot-1-260820.md).
+
 > **2026-08-18 구현:** `260818-01` 스레드 · `260818-02` file_id. 기획 [`.cursor/plans/threads-file-id.md`](.cursor/plans/threads-file-id.md).
 
 > **2026-08-05 MCP 1차 완료:** `260805-01`. 후속은 `260805-02` · `260818-03`.
@@ -30,7 +32,7 @@
 **목표(협업·로컬 유용성):** 팀원이 설치했을 때 실사용 체감이 큰 순으로 검증. 아래는 **미완료만**.
 
 - **260818-03. MCP 에이전트 계약 (에러 코드 · 커서 · 나머지)**  
-  **남은 것:** search 커서/offset, 에러 코드 전면 통일. (플랜 P2 일부는 같이 넣음: `docudog_by_hash`, excerpt `truncated`/`sha256`.)  
+  **남은 것:** search 커서/offset, 에러 코드 전면 통일. 날짜 필터·lineage 도구는 `260820-03`(Done).  
   **출처:** DocBank OpenAPI. 쓰기 HTTP·루프백 데몬은 **안 가져옴**.
 
 - **260818-04. watch settle / min-age (다운로드·Office 잠금)**  
@@ -79,6 +81,11 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 
 ### 완료 (Done)
 
+- **260820-01. `.docudog/` 산출물 격리** (`artifact_home`, 기본 `%USERPROFILE%/.docudog/`, 레거시 복사만). — 2026-08-20
+- **260820-02. PDF 텍스트 레이어** (`extract_pdf.py`, pypdf; 암호·빈 스캔 skip). — 2026-08-20
+- **260820-03. MCP 1클릭 + lineage/bundle + search 날짜** (`--write-all-mcp`, `docudog_get_lineage` / `get_context_bundle`). SSE 보류. — 2026-08-20
+- **260820-04. 트레이 + P1 토스트** (`--tray`, `--install-startup`, `notify.py`). status 강제 오픈 없음. — 2026-08-20
+- **260820-05. 이종 파일명 한 줄 semantic diff** (`lineage_peer_change_line`, MCP lineage `last_change_summary`). — 2026-08-20
 - **260818-01. 문서 스레드** (`docudog/threads.py`, status 「최근 대화」, HTML `<details>`, MCP `docudog_thread`): version + conversation/mixed. 새 MD 파일 없음. — 2026-08-18 · **구 #22**
 - **260818-02. 안정 file_id** (`docudog/file_ids.py`): state 레코드 UUID, 동일 SHA+사라진 경로 rename 유지, MCP get `file_id`. — 2026-08-18
 - **260813-01. HWP/HWPX 본문 추출** (`docudog/extract_hwp.py`, `syhwp`): hop/rhwp는 `reference/hop` 참조만; watcher가 `.hwp`/`.hwpx`를 분류 파이프에 태움. 암호화·배포용은 스킵. — 2026-08-13

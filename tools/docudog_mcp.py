@@ -63,7 +63,7 @@ def print_install(config_dir: str | None = None) -> None:
         },
         "agent_instructions": [
             "1. Ensure deps: pip install --user \"mcp[cli]\" (or -r requirements.txt).",
-            "2. Prefer: python tools/docudog_mcp.py --write-cursor-mcp",
+            "2. Prefer: python tools/docudog_mcp.py --write-all-mcp",
             "3. Or merge the cursor.mcpServers object into .cursor/mcp.json.",
             "4. For Claude Desktop, merge claude_desktop.mcpServers into "
             "claude_desktop_config.json and restart Claude.",
@@ -100,6 +100,39 @@ def write_cursor_mcp(config_dir: str | None = None, *, merge: bool = True) -> st
     return path
 
 
+def write_claude_desktop_mcp(config_dir: str | None = None, *, merge: bool = True) -> str:
+    path = os.path.expandvars(r"%APPDATA%\Claude\claude_desktop_config.json")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    entry = build_mcp_server_entry(config_dir=config_dir)
+    data: dict = {"mcpServers": {}}
+    if merge and os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                existing = json.load(f)
+            if isinstance(existing, dict):
+                data = existing
+        except (OSError, json.JSONDecodeError):
+            pass
+    servers = data.setdefault("mcpServers", {})
+    if not isinstance(servers, dict):
+        servers = {}
+        data["mcpServers"] = servers
+    servers["docudog"] = entry
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+    return path
+
+
+def write_all_mcp(config_dir: str | None = None) -> dict[str, str]:
+    return {
+        "cursor": write_cursor_mcp(config_dir),
+        "claude_desktop": write_claude_desktop_mcp(config_dir),
+    }
+
+
 def _mcp_import_ok() -> bool:
     try:
         from mcp.server.mcpserver import MCPServer  # noqa: F401
@@ -134,8 +167,10 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         name="docudog",
         instructions=(
             "DocuDog local document governance corpus (read-only). "
-            "Use docudog_search / docudog_get / docudog_status / docudog_thread to find "
-            "already-classified local files (tags, P1–P4, summaries, related paths, threads). "
+            "Use docudog_search, docudog_get_lineage, docudog_get_context_bundle, "
+            "docudog_get, docudog_status. "
+            "Do not request raw excerpts for P1/P2; MCP returns metadata only "
+            "(code excerpt_blocked_p1). Do not re-ask for original document text. "
             "Do not assume raw file contents are available for sensitive levels."
         ),
     )
@@ -158,10 +193,12 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         category_id: str = "",
         limit: int = 20,
         regex: bool = False,
+        since: str = "",
+        until: str = "",
     ) -> str:
         """
         Search classified DocuDog state (path/summary/tags/category).
-        level: optional P1|P2|P3|P4. Not full-text of unscanned files.
+        level: optional P1|P2|P3|P4. since/until: UTC YYYY-MM-DD. Not full-text of unscanned files.
         """
         return json.dumps(
             svc.search(
@@ -171,6 +208,8 @@ def run_mcp_server(config_dir: str | None = None) -> None:
                 category_id=category_id,
                 limit=limit,
                 regex=regex,
+                since=since,
+                until=until,
             ),
             ensure_ascii=False,
             indent=2,
@@ -221,6 +260,24 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         """Find classified files whose SHA-256 starts with or equals the given hex."""
         return json.dumps(svc.by_hash(sha256, limit=limit), ensure_ascii=False, indent=2)
 
+    @mcp.tool()
+    def docudog_get_lineage(path: str = "", file_id: str = "") -> str:
+        """Latest version in a lineage/thread plus member timeline and change one-liners."""
+        return json.dumps(
+            svc.get_lineage(path=path, file_id=file_id),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.tool()
+    def docudog_get_context_bundle(path: str = "", file_id: str = "") -> str:
+        """Related files and time-window context bundles for an anchor document."""
+        return json.dumps(
+            svc.get_context_bundle(path=path, file_id=file_id),
+            ensure_ascii=False,
+            indent=2,
+        )
+
     mcp.run(transport="stdio")
 
 
@@ -243,11 +300,44 @@ def main() -> int:
         action="store_true",
         help="Write/merge .cursor/mcp.json with docudog server entry",
     )
+    parser.add_argument(
+        "--write-claude-desktop-mcp",
+        action="store_true",
+        help="Write/merge Claude Desktop claude_desktop_config.json",
+    )
+    parser.add_argument(
+        "--write-all-mcp",
+        action="store_true",
+        help="Write Cursor and Claude Desktop MCP configs",
+    )
     args = parser.parse_args()
     cfg_dir = os.path.normpath(os.path.abspath(args.config_dir))
 
     if args.print_install:
         print_install(cfg_dir)
+        return 0
+    if args.write_all_mcp:
+        if not _mcp_import_ok():
+            print(
+                "mcp package is missing; clients will show docudog as disconnected.\n"
+                '  pip install --user "mcp[cli]"',
+                file=sys.stderr,
+            )
+            return 2
+        written = write_all_mcp(cfg_dir)
+        print(f"Wrote Cursor MCP: {written['cursor']}")
+        print(f"Wrote Claude Desktop MCP: {written['claude_desktop']}")
+        return 0
+    if args.write_claude_desktop_mcp:
+        if not _mcp_import_ok():
+            print(
+                "mcp package is missing.\n  pip install --user \"mcp[cli]\"",
+                file=sys.stderr,
+            )
+            return 2
+        path = write_claude_desktop_mcp(cfg_dir)
+        print(f"Wrote Claude Desktop MCP config: {path}")
+        print("Restart Claude Desktop and call docudog_ping.")
         return 0
     if args.write_cursor_mcp:
         if not _mcp_import_ok():

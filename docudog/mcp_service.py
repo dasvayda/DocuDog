@@ -9,6 +9,7 @@ from typing import Any
 
 from . import mobile_digest, semantic_diff, status_dashboard
 from .config_loader import load_app_config
+from . import artifact_home
 from .paths_util import is_unc_path, normalize_fs_path
 from .security_labels import format_security_level
 
@@ -35,22 +36,10 @@ class McpService:
         return raw if isinstance(raw, dict) else {}
 
     def state_path(self) -> str:
-        paths = self.cfg.get("paths") or {}
-        raw = str(
-            paths.get("state_path")
-            or os.path.join("%USERPROFILE%", "Documents", "DocuDog_state.json")
-        )
-        return normalize_fs_path(os.path.expandvars(raw))
+        return artifact_home.resolve_state_path(self.cfg)
 
     def report_path(self) -> str:
-        paths = self.cfg.get("paths") or {}
-        raw = str(
-            paths.get("report_path")
-            or os.path.join(
-                "%USERPROFILE%", "Documents", "classification_report.md"
-            )
-        )
-        return normalize_fs_path(os.path.expandvars(raw))
+        return artifact_home.resolve_report_path(self.cfg)
 
     def allowlist_roots(self) -> list[str]:
         ms = self.mcp_settings()
@@ -182,6 +171,8 @@ class McpService:
         category_id: str = "",
         limit: int = 20,
         regex: bool = False,
+        since: str = "",
+        until: str = "",
     ) -> dict[str, Any]:
         state = self.load_state()
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
@@ -211,6 +202,11 @@ class McpService:
                 continue
             cats = [str(c) for c in (meta.get("category_ids") or [])]
             if cat_q and cat_q not in cats:
+                continue
+            day = str(meta.get("last_analyzed_utc") or "")[:10]
+            if since.strip() and day and day < since.strip()[:10]:
+                continue
+            if until.strip() and day and day > until.strip()[:10]:
                 continue
             blob = f"{path}\n{meta.get('summary') or ''}\n{tag_join}\n{' '.join(cats)}"
             if q:
@@ -283,7 +279,11 @@ class McpService:
                         f"security_level {sec} exceeds "
                         f"max_security_level_for_excerpt={self.max_excerpt_level()}"
                     )
-                    row["code"] = "excerpt_blocked"
+                    row["code"] = (
+                        "excerpt_blocked_p1"
+                        if str(sec).upper() in ("P1", "P2")
+                        else "excerpt_blocked"
+                    )
                 elif not os.path.isfile(norm):
                     row["excerpt"] = None
                     row["excerpt_denied"] = "file_missing_on_disk"
@@ -363,6 +363,102 @@ class McpService:
                 "file_id": file_id,
             }
         return {"ok": True, "thread": got}
+
+    def get_lineage(self, path: str = "", file_id: str = "") -> dict[str, Any]:
+        state = self.load_state()
+        from . import threads as threads_mod
+
+        rows = state.get("threads") if isinstance(state.get("threads"), list) else []
+        if not rows:
+            threads_mod.refresh_threads(self.cfg, state)
+            rows = state.get("threads") if isinstance(state.get("threads"), list) else []
+        th = threads_mod.find_thread(rows, path=path, file_id=file_id)
+        if th is None:
+            resolved = self.get(path=path, file_id=file_id)
+            if resolved.get("ok"):
+                th = threads_mod.find_thread(
+                    rows,
+                    path=str(resolved.get("path") or ""),
+                    file_id=str(resolved.get("file_id") or ""),
+                )
+        if th is None:
+            return {
+                "ok": False,
+                "code": "lineage_not_found",
+                "error": "no version/conversation thread for this file",
+                "path": path,
+                "file_id": file_id,
+            }
+        members = list(th.get("members") or [])
+        files = state.get("files") if isinstance(state.get("files"), dict) else {}
+
+        def _meta_for(path: str) -> dict[str, Any]:
+            m = files.get(path)
+            if isinstance(m, dict):
+                return m
+            want = os.path.normcase(path)
+            for fp, fm in files.items():
+                if os.path.normcase(fp) == want and isinstance(fm, dict):
+                    return fm
+            return {}
+
+        changes: list[dict[str, Any]] = []
+        for m in members:
+            if not isinstance(m, dict):
+                continue
+            p = str(m.get("path") or "")
+            meta = _meta_for(p)
+            changes.append(
+                {
+                    "path": p,
+                    "basename": m.get("basename"),
+                    "summary": m.get("summary"),
+                    "utc": m.get("utc"),
+                    "last_change_summary": meta.get("last_change_summary") or "",
+                }
+            )
+        latest_change = ""
+        if changes:
+            latest_change = str(changes[0].get("last_change_summary") or "")
+        return {
+            "ok": True,
+            "latest_path": th.get("latest_path"),
+            "latest_file_id": th.get("latest_file_id"),
+            "title": th.get("title"),
+            "kind": th.get("kind"),
+            "thread_id": th.get("id"),
+            "one_liner": th.get("one_liner") or latest_change,
+            "last_change_summary": latest_change,
+            "members": changes,
+        }
+
+    def get_context_bundle(self, path: str = "", file_id: str = "") -> dict[str, Any]:
+        resolved = self.get(path=path, file_id=file_id)
+        if not resolved.get("ok"):
+            return resolved
+        anchor = str(resolved.get("path") or "")
+        state = self.load_state()
+        bundles_out: list[dict[str, Any]] = []
+        raw = state.get("context_bundles")
+        if isinstance(raw, list):
+            for b in raw:
+                if not isinstance(b, dict):
+                    continue
+                rel = [str(x) for x in (b.get("related_paths") or [])]
+                if os.path.normcase(str(b.get("anchor_path") or "")) == os.path.normcase(
+                    anchor
+                ) or any(
+                    os.path.normcase(p) == os.path.normcase(anchor) for p in rel
+                ):
+                    bundles_out.append(b)
+        related = self.related(anchor, limit=8)
+        return {
+            "ok": True,
+            "anchor": anchor,
+            "related_paths": resolved.get("related_paths") or [],
+            "related": related.get("related") if related.get("ok") else [],
+            "context_bundles": bundles_out[:8],
+        }
 
     def last_classify(self) -> dict[str, Any]:
         from . import last_classify as lc

@@ -15,6 +15,7 @@ from typing import Any
 
 import psutil
 from docudog import (
+    artifact_home,
     context_bundles,
     inference,
     lineage,
@@ -343,6 +344,16 @@ def _parse_cli() -> argparse.Namespace:
         action="store_true",
         help="Process one queued file then exit (also DOCUDOG_RUN_ONCE=1).",
     )
+    parser.add_argument(
+        "--tray",
+        action="store_true",
+        help="Attach a system tray icon (MCP write / data folder / pause). Does not open status.md.",
+    )
+    parser.add_argument(
+        "--install-startup",
+        action="store_true",
+        help="Write a Windows Startup shortcut for main.py --tray, then exit.",
+    )
     return parser.parse_args()
 
 
@@ -400,6 +411,16 @@ def main() -> None:
     run_once = _run_once_enabled(args)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(args, "install_startup", False):
+        from docudog.tray_app import install_startup_shortcut
+
+        try:
+            path = install_startup_shortcut(repo_root=base_dir)
+        except Exception as e:
+            print(f"DocuDog: startup shortcut failed: {e}", file=sys.stderr)
+            sys.exit(2)
+        print(path)
+        return
     cfg_path = os.path.join(base_dir, "config.json")
     if not os.path.isfile(cfg_path):
         print(f"config.json not found at {cfg_path}", file=sys.stderr)
@@ -439,17 +460,15 @@ def main() -> None:
 
     inference.log_inference_runtime_summary(cfg)
 
+    if getattr(args, "tray", False):
+        from docudog.tray_app import attach_tray
+
+        attach_tray(cfg, config_dir=base_dir)
+
     paths = cfg.get("paths", {})
-    state_path = paths.get(
-        "state_path",
-        os.path.join("%USERPROFILE%", "Documents", "DocuDog_Data", "state.json"),
-    )
-    report_path = paths.get(
-        "report_path",
-        os.path.join("%USERPROFILE%", "Documents", "DocuDog_Reports", "classification_report.md"),
-    )
-    state_path = os.path.normpath(os.path.expandvars(state_path))
-    report_path = os.path.normpath(os.path.expandvars(report_path))
+    state_path = artifact_home.resolve_state_path(cfg)
+    report_path = artifact_home.resolve_report_path(cfg)
+    artifact_home.ensure_artifact_home(cfg, state_path)
 
     _ensure_parent_dir(state_path, label="state_path")
     _ensure_parent_dir(report_path, label="report_path")

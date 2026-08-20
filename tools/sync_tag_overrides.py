@@ -10,7 +10,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from docudog.config_loader import load_app_config  # noqa: E402
+from docudog import artifact_home  # noqa: E402
 from docudog import lineage  # noqa: E402
 from docudog import owner_tags  # noqa: E402
 from main import load_state, save_state_atomic  # noqa: E402
@@ -18,25 +18,8 @@ from main import load_state, save_state_atomic  # noqa: E402
 
 def main() -> int:
     cfg = load_app_config(ROOT)
-    paths = cfg.get("paths") or {}
-    state_path = os.path.normpath(
-        os.path.expandvars(
-            paths.get(
-                "state_path",
-                os.path.join("%USERPROFILE%", "Documents", "DocuDog_state.json"),
-            )
-        )
-    )
-    report_path = os.path.normpath(
-        os.path.expandvars(
-            paths.get(
-                "report_path",
-                os.path.join(
-                    "%USERPROFILE%", "Documents", "classification_report.md"
-                ),
-            )
-        )
-    )
+    state_path = artifact_home.resolve_state_path(cfg)
+    report_path = artifact_home.resolve_report_path(cfg)
 
     state = load_state(state_path)
     odoc = owner_tags.load_tag_overrides(cfg, state_path)

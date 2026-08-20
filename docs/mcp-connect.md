@@ -6,10 +6,10 @@ When the user says **"DocuDog을 MCP로 연결해줘"** / **"connect DocuDog MCP
 
 ```bash
 pip install --user -r requirements.txt
-python tools/docudog_mcp.py --write-cursor-mcp
+python tools/docudog_mcp.py --write-all-mcp
 ```
 
-`--write-cursor-mcp` only writes `.cursor/mcp.json`. It does not start the server.
+`--write-cursor-mcp` / `--write-claude-desktop-mcp` / `--write-all-mcp` only write JSON. They do not start the server. No npm. Localhost SSE is not implemented (stdio only).
 
 Then in Cursor:
 
@@ -55,8 +55,10 @@ Use paths from `--print-install` (do not leave placeholders).
 |------|---------|
 | `docudog_ping` | Health + state path |
 | `docudog_status` | Today / actions / digest |
-| `docudog_search` | Classified corpus (tags, P-level, summary) |
+| `docudog_search` | Corpus search; optional `since`/`until` UTC dates |
 | `docudog_get` | One file meta (path or `file_id`, optional excerpt) |
+| `docudog_get_lineage` | Latest version in a thread + member timeline |
+| `docudog_get_context_bundle` | Related paths + time-window bundles |
 | `docudog_thread` | Version/conversation thread by id, path, or file_id |
 | `docudog_by_hash` | Files with matching SHA-256 prefix |
 | `docudog_last_classify` | Latest classify companion JSON |
@@ -69,11 +71,12 @@ Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified 
 
 - Path allowlist ≈ watch roots + output folder (`enforce_allowlist`, default true)
 - Excerpt capped by `max_security_level_for_excerpt` (default **P4** = least sensitive only)
+- P1/P2 excerpt denial uses `code`: `excerpt_blocked_p1`. Do not re-ask for original text.
 - No write tools for user documents
 
 ## Agent checklist
 
-1. `python tools/docudog_mcp.py --write-cursor-mcp` (or merge `--print-install` JSON)
+1. `python tools/docudog_mcp.py --write-all-mcp` (or `--write-cursor-mcp`)
 2. Confirm `mcp` package installed (`pip install --user "mcp[cli]"`)
 3. Toggle project MCP **docudog** on in Cursor Settings
 4. Call `docudog_ping`

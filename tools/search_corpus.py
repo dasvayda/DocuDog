@@ -17,6 +17,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from docudog.config_loader import load_app_config  # noqa: E402
+from docudog import artifact_home  # noqa: E402
 from docudog.security_labels import format_security_level  # noqa: E402
 
 
@@ -35,14 +36,7 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = load_app_config(args.config_dir)
-    state_path = os.path.normpath(
-        os.path.expandvars(
-            str(
-                (cfg.get("paths") or {}).get("state_path")
-                or "%USERPROFILE%/Documents/DocuDog_state.json"
-            )
-        )
-    )
+    state_path = artifact_home.resolve_state_path(cfg)
     if not os.path.isfile(state_path):
         print(f"search_corpus: state missing: {state_path}", file=sys.stderr)
         return 1

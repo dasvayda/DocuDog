@@ -17,6 +17,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from docudog.config_loader import load_app_config  # noqa: E402
+from docudog import artifact_home  # noqa: E402
 from docudog.security_labels import format_security_level  # noqa: E402
 
 
@@ -102,20 +103,8 @@ def main() -> int:
     )
     args = parser.parse_args()
     cfg = load_app_config(args.config_dir)
-    paths = cfg.get("paths") or {}
-    state_path = os.path.normpath(
-        os.path.expandvars(
-            str(paths.get("state_path") or "%USERPROFILE%/Documents/DocuDog_state.json")
-        )
-    )
-    report_path = os.path.normpath(
-        os.path.expandvars(
-            str(
-                paths.get("report_path")
-                or "%USERPROFILE%/Documents/classification_report.md"
-            )
-        )
-    )
+    state_path = artifact_home.resolve_state_path(cfg)
+    report_path = artifact_home.resolve_report_path(cfg)
     state = _load_state(state_path)
     findings = run_lint(cfg, state, report_path)
     out = args.out.strip()

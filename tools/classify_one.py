@@ -16,6 +16,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from docudog import inference, single_file  # noqa: E402
+from docudog import artifact_home  # noqa: E402
 from main import load_config, load_state, save_state_atomic  # noqa: E402
 
 
@@ -66,14 +67,8 @@ def main() -> int:
     inference.log_inference_runtime_summary(cfg)
 
     paths = cfg.get("paths", {})
-    state_path = args.state or paths.get(
-        "state_path",
-        os.path.join("%USERPROFILE%", "Documents", "DocuDog_state.json"),
-    )
-    report_path = args.report or paths.get(
-        "report_path",
-        os.path.join("%USERPROFILE%", "Documents", "classification_report.md"),
-    )
+    state_path = args.state or artifact_home.resolve_state_path(cfg)
+    report_path = args.report or artifact_home.resolve_report_path(cfg)
     state_path = os.path.normpath(os.path.expandvars(str(state_path)))
     report_path = os.path.normpath(os.path.expandvars(str(report_path)))
 

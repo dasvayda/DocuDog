@@ -3,7 +3,7 @@
 이 문서는 **DocuDog가 로컬에 쓰는 산출물을 읽는** 스크립트·에이전트용이다.  
 DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../AGENTS.md)를 본다 (목적·독자가 다름).
 
-기본 위치는 `paths.report_path` / `paths.state_path` 부모 폴더다. 예: `%USERPROFILE%/Documents/DocuDog/`.
+기본 위치는 `%USERPROFILE%/.docudog/` (`paths.artifact_home` / `state_path` / `report_path`). 워치 폴더와 분리됨. 예전 `Documents/DocuDog/` 는 새 홈이 비면 복사만 함.
 
 ---
 
@@ -21,8 +21,7 @@ DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../
 | `DocuDog_last_classify.json` | `last_classify_path` | 최근 1건 분류(공유 직후 companion) | 분류 성공 시 |
 | `DocuDog_tag_overrides.json` | `tag_overrides_path` | 소유자 태그/등급 덮어쓰기 | 수동/도구 |
 
-권장 사용자 진입점: **`DocuDog_status.md`** (또는 동일 basename `.html`).  
-상세 추적: report / activity / audit / lineage.
+권장 사용자 진입점: **DocuDog MCP** (Cursor/Claude). `DocuDog_status.md`는 `.docudog/` 안 옵션 산출물.
 
 ---
 

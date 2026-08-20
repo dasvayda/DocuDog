@@ -50,15 +50,26 @@ flowchart LR
 
 1. **`main.py`** — Loads `config.json`, expands paths, enforces run lock, applies background priority, runs `startup_model_probe`, starts observer, drains queue when user idle.
 2. **`docudog/watcher.py`** — Recursive watch under configured roots; startup directory scan enqueues eligible files; idle polling for processing windows.
-3. **`docudog/router.py`** — Extension/size filters, MVP skip for PDF, extracts text (txt/md/docx/pptx/xlsx/hwp/hwpx), content-hash skip, appends report, updates state; invokes `docudog.inference`. HWP/HWPX uses `docudog/extract_hwp.py` (`syhwp`); `reference/hop` is not imported.
+3. **`docudog/router.py`** — Extension/size filters, extracts text (txt/md/docx/pptx/xlsx/hwp/hwpx/pdf text layer), content-hash skip, appends report, updates state; invokes `docudog.inference`. HWP/HWPX uses `docudog/extract_hwp.py` (`syhwp`); PDF uses `docudog/extract_pdf.py` (`pypdf`). `reference/hop` is not imported.
 4. **`docudog/inference.py`** — Builds classification prompt; opens LiteRT-LM engine with configured max output tokens; parses/validates JSON; retry on schema failure; exposes `LiteRTInferenceError.stage` for failure localization.
 5. **`docudog/env_litert.py`** — Sets TF/GLOG-related defaults before native load; **optional** stderr silencing via global `dup2` (`DOCUDOG_SILENCE_LITERT_STDERR=1`, **default off** — on some Windows + LiteRT builds, redirecting fd 2 breaks init/inference).
 6. **`docudog/reporter.py` / `docudog/lineage.py`** — Human-readable audit trail; lineage map with **filename-key and/or fuzzy clustering** (stem + summary overlap, union-find) plus optional LLM hints.
 
+## Document text parsers
+
+Entry: `docudog/router.extract_document_text` (Hangul via `docudog/extract_hwp.py`). Pins live in `requirements.txt`. Versions below are what this Windows env currently resolves (`importlib.metadata`, 2026-08-20) — bump this list when you `pip install -U` a parser.
+
+- `.txt` / `.md` — stdlib `open(..., encoding="utf-8", errors="replace")`. No third-party parser.
+- `.docx` — `python-docx` **1.2.0** (`import docx`; pin `>=1.1.0`). Paragraphs and table cells.
+- `.pptx` — `python-pptx` **1.0.2** (`from pptx import Presentation`; pin `>=0.6.23`). Visible shape text per slide.
+- `.xlsx` — `openpyxl` **3.1.5** (`load_workbook` read_only / `data_only`; pin `>=3.1.0`). Cell values per sheet.
+- `.hwp` / `.hwpx` — `syhwp` **0.0.7** (`syhwp.extract_text`; pin `>=0.0.7`). HWP5 OLE goes through dependency `olefile` **0.47**. Encrypted or distribution (copy-protected) files are skipped. `reference/hop` / `rhwp` are not imported.
+- `.pdf` — `pypdf` (pin `>=5.0.0`): 텍스트 레이어만. 암호·빈 본문(스캔)은 skip. OCR 없음.
+
 ## Configuration touchpoints
 
 - **Watch**: `watch_settings`, `file_filters`, `idle_settings`
-- **Storage**: `paths.state_path`, `paths.report_path`, run lock, optional `paths.audit_log_path`, `paths.tag_overrides_path` — owner overrides: [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md)
+- **Storage**: `paths.artifact_home` default `%USERPROFILE%/.docudog/`; `state_path`, `report_path`, run lock, optional audit/tag overrides
 - **Model**: `model.use_mock`, `model.litert_lm_bundle_path`, `model.litert_max_output_tokens`, `model.max_context_chars`, probe flags
 
 ## LiteRT-LM runtime fingerprint (verified)

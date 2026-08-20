@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from difflib import unified_diff
 from typing import Any
@@ -110,6 +111,58 @@ def build_change_line(
     if not line:
         line = heuristic_change_line(prev_summary, new_summary, delta)
     return line
+
+
+def lineage_peer_change_line(
+    cfg: dict[str, Any],
+    state: dict[str, Any],
+    new_path: str,
+    new_summary: str,
+    new_text: str,
+) -> str:
+    """One-line change vs the previous member of the same lineage/version group."""
+    from .lineage import _build_multi_groups
+
+    files = state.get("files") if isinstance(state.get("files"), dict) else {}
+    rows: list[tuple[str, dict[str, Any]]] = []
+    for path, meta in files.items():
+        if isinstance(meta, dict) and meta.get("sha256"):
+            rows.append((path, meta))
+    if len(rows) < 2:
+        return ""
+    multi, _s, _n = _build_multi_groups(rows, cfg)
+    for _gk, members in multi:
+        if new_path not in {p for p, _m in members}:
+            continue
+        others = [
+            (p, m)
+            for p, m in members
+            if os.path.normcase(p) != os.path.normcase(new_path)
+        ]
+        if not others:
+            continue
+        others.sort(
+            key=lambda pm: str(pm[1].get("last_analyzed_utc") or ""),
+            reverse=True,
+        )
+        prev_path, prev_meta = others[0]
+        old_text = ""
+        try:
+            from .router import extract_document_text
+
+            t, skip = extract_document_text(prev_path, cfg)
+            if not skip and t:
+                old_text = t[:2000]
+        except Exception:
+            logger.debug("peer extract failed for %s", prev_path, exc_info=True)
+        return build_change_line(
+            str(prev_meta.get("summary") or ""),
+            new_summary,
+            old_text,
+            (new_text or "")[:2000],
+            cfg,
+        )
+    return ""
 
 
 def push_summary_history(
