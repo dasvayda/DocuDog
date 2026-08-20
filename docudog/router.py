@@ -25,7 +25,7 @@ from . import reporter
 from . import rule_hints
 from . import semantic_diff
 from . import skip_insights
-from . import status_dashboard
+from . import file_ids, status_dashboard
 
 logger = logging.getLogger(__name__)
 
@@ -235,9 +235,14 @@ def process_file(
 
     digest = sha256_file(norm, cfg=config)
     prev = files_state.get(norm)
+    if not isinstance(prev, dict):
+        adopted = file_ids.adopt_rename(files_state, norm, digest, config)
+        if isinstance(adopted, dict):
+            prev = adopted
 
     if isinstance(prev, dict) and prev.get("sha256") == digest:
         prev["last_checked_utc"] = _utc_now_iso()
+        file_ids.ensure_file_id(prev)
         files_state[norm] = prev
         save_state()
         logger.debug("Skip LLM (unchanged content hash): %s", norm)
@@ -380,7 +385,11 @@ def process_file(
         inference_source=inf_src,
     )
 
+    keep_id = ""
+    if isinstance(prev, dict):
+        keep_id = str(prev.get("file_id") or "").strip()
     files_state[norm] = {
+        "file_id": keep_id or file_ids.new_id(),
         "sha256": digest,
         "last_analyzed_utc": analyzed_at.isoformat(),
         "last_checked_utc": _utc_now_iso(),

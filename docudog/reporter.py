@@ -155,6 +155,48 @@ def markdown_report_to_html(
             body_parts.append(f"<h1>{_inline_md_to_html(stripped[2:].strip())}</h1>")
             i += 1
             continue
+        if stripped.startswith("## "):
+            body_parts.append(f"<h2>{_inline_md_to_html(stripped[3:].strip())}</h2>")
+            i += 1
+            continue
+        if stripped.startswith("### "):
+            body_parts.append(f"<h3>{_inline_md_to_html(stripped[4:].strip())}</h3>")
+            i += 1
+            continue
+        if stripped.startswith("- "):
+            items: list[tuple[int, str]] = []
+            while i < n:
+                raw = lines[i]
+                st = raw.rstrip()
+                if not st.strip():
+                    break
+                if st.startswith("- "):
+                    items.append((0, st[2:].strip()))
+                    i += 1
+                    continue
+                if st.startswith("  - "):
+                    items.append((1, st[4:].strip()))
+                    i += 1
+                    continue
+                break
+            lis: list[str] = []
+            nested: list[str] = []
+            def _flush_nested() -> None:
+                nonlocal nested
+                if nested:
+                    lis[-1] = lis[-1][:-5] + "<ul>" + "".join(nested) + "</ul></li>"
+                    nested = []
+            for depth, text in items:
+                if depth == 0:
+                    _flush_nested()
+                    lis.append(f"<li>{_inline_md_to_html(text)}</li>")
+                else:
+                    if not lis:
+                        lis.append("<li></li>")
+                    nested.append(f"<li>{_inline_md_to_html(text)}</li>")
+            _flush_nested()
+            body_parts.append("<ul>\n" + "\n".join(lis) + "\n</ul>")
+            continue
         if stripped.startswith("> "):
             note_lines = [stripped[2:]]
             i += 1
@@ -231,6 +273,17 @@ def markdown_report_to_html(
         "  padding: 2rem 1.25rem 3rem;\n"
         "}\n"
         "h1 { font-size: 1.6rem; margin: 0 0 0.75rem; letter-spacing: -0.02em; }\n"
+        "h2 { font-size: 1.15rem; margin: 1.25rem 0 0.5rem; }\n"
+        "h3 { font-size: 1.02rem; margin: 1rem 0 0.4rem; }\n"
+        "ul { color: var(--ink); margin: 0.35rem 0 1rem; padding-left: 1.25rem; }\n"
+        "details.thread {\n"
+        "  background: var(--card);\n"
+        "  border: 1px solid var(--line);\n"
+        "  border-radius: 8px;\n"
+        "  margin: 0.35rem 0;\n"
+        "  padding: 0.35rem 0.75rem;\n"
+        "}\n"
+        "details.thread summary { cursor: pointer; font-weight: 600; }\n"
         "p { color: var(--muted); margin: 0.5rem 0 1rem; }\n"
         ".table-wrap {\n"
         "  overflow-x: auto;\n"

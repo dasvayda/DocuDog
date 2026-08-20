@@ -100,6 +100,18 @@ def write_cursor_mcp(config_dir: str | None = None, *, merge: bool = True) -> st
     return path
 
 
+def _mcp_import_ok() -> bool:
+    try:
+        from mcp.server.mcpserver import MCPServer  # noqa: F401
+        return True
+    except ImportError:
+        try:
+            from mcp.server.fastmcp import FastMCP  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+
 def run_mcp_server(config_dir: str | None = None) -> None:
     try:
         from mcp.server.mcpserver import MCPServer
@@ -122,8 +134,8 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         name="docudog",
         instructions=(
             "DocuDog local document governance corpus (read-only). "
-            "Use docudog_search / docudog_get / docudog_status to find already-classified "
-            "local files (tags, P1–P4, summaries, related paths). "
+            "Use docudog_search / docudog_get / docudog_status / docudog_thread to find "
+            "already-classified local files (tags, P1–P4, summaries, related paths, threads). "
             "Do not assume raw file contents are available for sensitive levels."
         ),
     )
@@ -165,13 +177,13 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         )
 
     @mcp.tool()
-    def docudog_get(path: str, include_excerpt: bool = False) -> str:
+    def docudog_get(path: str = "", file_id: str = "", include_excerpt: bool = False) -> str:
         """
-        One file metadata from DocuDog_state.json.
+        One file metadata from DocuDog_state.json (path or file_id).
         include_excerpt: optional short text; blocked when security exceeds mcp_settings.
         """
         return json.dumps(
-            svc.get(path, include_excerpt=include_excerpt),
+            svc.get(path, file_id=file_id, include_excerpt=include_excerpt),
             ensure_ascii=False,
             indent=2,
         )
@@ -194,6 +206,20 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         return json.dumps(
             svc.related(path, limit=limit), ensure_ascii=False, indent=2
         )
+
+    @mcp.tool()
+    def docudog_thread(thread_id: str = "", path: str = "", file_id: str = "") -> str:
+        """One document thread (version or conversation) by id, path, or file_id."""
+        return json.dumps(
+            svc.thread(thread_id=thread_id, path=path, file_id=file_id),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.tool()
+    def docudog_by_hash(sha256: str, limit: int = 20) -> str:
+        """Find classified files whose SHA-256 starts with or equals the given hex."""
+        return json.dumps(svc.by_hash(sha256, limit=limit), ensure_ascii=False, indent=2)
 
     mcp.run(transport="stdio")
 
@@ -224,9 +250,18 @@ def main() -> int:
         print_install(cfg_dir)
         return 0
     if args.write_cursor_mcp:
+        if not _mcp_import_ok():
+            print(
+                "mcp package is missing; Cursor will show docudog as disconnected.\n"
+                '  pip install --user "mcp[cli]"\n'
+                "or: pip install --user -r requirements.txt",
+                file=sys.stderr,
+            )
+            return 2
         path = write_cursor_mcp(cfg_dir)
         print(f"Wrote Cursor MCP config: {path}")
-        print("Reload MCP / restart Cursor agent chat if tools do not appear.")
+        print("Enable the project server 'docudog' in Cursor Settings > MCP.")
+        print("Then reload MCP or start a new agent chat and call docudog_ping.")
         return 0
 
     run_mcp_server(cfg_dir)

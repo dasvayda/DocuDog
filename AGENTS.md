@@ -6,6 +6,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 
 - **Goal**: Background file watching + idle-aware scheduling, local document text extraction, **on-device LLM** classification (tags, P1–P4 security level, summary), append-only Markdown report and optional lineage output.
 - **MVP scope**: "Watcher" pipeline only: no UI, no server sync in code paths that ship today.
+- **User-facing feature map:** [Features.md](Features.md) (what to open, what you get). Module inventory: [docs/implemented-features.md](docs/implemented-features.md).
 
 ## Repository map (Python)
 
@@ -19,6 +20,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | LiteRT env | `docudog/env_litert.py` | Native log suppression, `apply_litert_env_defaults()` |
 | Report | `docudog/reporter.py` | Append rows to `classification_report.md` and sync sibling `classification_report.html` |
 | Lineage | `docudog/lineage.py` | Mermaid map + optional `llm_cluster_hints`; **similarity** clustering (`clustering`, Jaccard+difflib) |
+| Threads | `docudog/threads.py`, `docudog/file_ids.py` | Status inbox threads + stable `file_id` (rename-safe) |
 | Audit | `docudog/audit.py` | P1/P2 append-only `DocuDog_audit_log.md` + optional LLM handling hint |
 | Owner tags | `docudog/owner_tags.py`, `DocuDog_tag_overrides.json`, `tools/sync_tag_overrides.py` | **No web UI** — local JSON; guide [docs/owner-tag-overrides.md](docs/owner-tag-overrides.md) |
 | Categories | `docudog/categories.py`, `DocuDog_categories.json` | Owner taxonomy + few-shot prompt (`category_settings`) |

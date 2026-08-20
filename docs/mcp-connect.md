@@ -9,7 +9,13 @@ pip install --user -r requirements.txt
 python tools/docudog_mcp.py --write-cursor-mcp
 ```
 
-Then reload MCP in Cursor (or restart the agent chat). Verify with tool **`docudog_ping`**.
+`--write-cursor-mcp` only writes `.cursor/mcp.json`. It does not start the server.
+
+Then in Cursor:
+
+1. **Settings → MCP** — project server **docudog** must be **enabled** (new project servers stay off until you toggle them).
+2. If status is error/disconnected, install deps: `pip install --user "mcp[cli]"` (same Python as in `mcp.json` `command`).
+3. Reload MCP or start a **new** agent chat. Verify with **`docudog_ping`**.
 
 ## Print config (any client)
 
@@ -50,12 +56,14 @@ Use paths from `--print-install` (do not leave placeholders).
 | `docudog_ping` | Health + state path |
 | `docudog_status` | Today / actions / digest |
 | `docudog_search` | Classified corpus (tags, P-level, summary) |
-| `docudog_get` | One file meta (+ optional excerpt) |
+| `docudog_get` | One file meta (path or `file_id`, optional excerpt) |
+| `docudog_thread` | Version/conversation thread by id, path, or file_id |
+| `docudog_by_hash` | Files with matching SHA-256 prefix |
 | `docudog_last_classify` | Latest classify companion JSON |
 | `docudog_recent_changes` | Semantic change one-liners |
 | `docudog_related` | Related paths for an anchor |
 
-Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified files into `DocuDog_state.json` first.
+Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified files into `DocuDog_state.json` first. Threads/`file_id` are written when status refreshes (daemon classify or startup).
 
 ## Security defaults (`mcp_settings` in config)
 
@@ -66,8 +74,9 @@ Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified 
 ## Agent checklist
 
 1. `python tools/docudog_mcp.py --write-cursor-mcp` (or merge `--print-install` JSON)
-2. Confirm `mcp` package installed
-3. Call `docudog_ping`
+2. Confirm `mcp` package installed (`pip install --user "mcp[cli]"`)
+3. Toggle project MCP **docudog** on in Cursor Settings
+4. Call `docudog_ping`
 4. If state missing, tell user to run `main.py` / classify once — MCP does not invent files
 
-See also: [docudog-output-spec.md](docudog-output-spec.md), backlog #21 in [to-do-list.md](../to-do-list.md).
+See also: [docudog-output-spec.md](docudog-output-spec.md), backlog `260805-01` in [to-do-list.md](../to-do-list.md).

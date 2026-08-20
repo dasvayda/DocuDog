@@ -71,6 +71,15 @@ def build_mobile_payload(
         "cadence_misses": [r.get("message") for r in misses],
         "p1_label": format_security_level("P1", cfg),
         "p2_label": format_security_level("P2", cfg),
+        "threads_top": [
+            {
+                "title": t.get("title"),
+                "count": t.get("member_count"),
+                "today_n": t.get("today_n"),
+            }
+            for t in (state.get("threads") or [])[:3]
+            if isinstance(t, dict)
+        ],
     }
 
 

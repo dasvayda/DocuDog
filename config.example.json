@@ -137,6 +137,16 @@
     "context_bundle_max_bundles": 60,
     "context_bundle_max_event_buffer": 800
   },
+  "thread_settings": {
+    "enabled": true,
+    "max_threads": 20,
+    "max_members": 12,
+    "include_conversations": true,
+    "min_rel_depth": 1,
+    "header_limit": 10,
+    "unfold_members": 8,
+    "rename_window_hours": 24
+  },
   "audit_settings": {
     "enabled": true,
     "llm_handling_hint": true,

@@ -61,7 +61,12 @@ model:
 #   min_battery_percent: 30
 #   require_charging: false
 #
-# cadence_settings:
+# thread_settings:
+#   enabled: true
+#   include_conversations: true
+#   min_rel_depth: 1          # folders directly under a watch root only
+#   rename_window_hours: 24
+#
 #   enabled: true
 #   rules:
 #     - id: weekly_report

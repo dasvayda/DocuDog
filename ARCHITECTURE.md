@@ -2,7 +2,8 @@
 
 DocuDog **Stage 1 (Watcher)** architecture, aligned with [master-plan.md](master-plan.md): idle-aware collection, routing, local LLM auto-labeling, local report output.
 
-**Implemented capability inventory (review / changelog-oriented):** [docs/implemented-features.md](docs/implemented-features.md)
+**User-facing feature map:** [Features.md](Features.md)  
+**Implemented capability inventory (modules / changelog):** [docs/implemented-features.md](docs/implemented-features.md)
 
 ## Layout (Python)
 

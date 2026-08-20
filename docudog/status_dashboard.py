@@ -44,14 +44,6 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def _newest_in_group(members: list[tuple[str, dict[str, Any]]]) -> tuple[str, dict[str, Any]]:
-    def key(item: tuple[str, dict[str, Any]]) -> str:
-        meta = item[1]
-        return str(meta.get("last_analyzed_utc") or meta.get("last_checked_utc") or "")
-
-    return max(members, key=key)
-
-
 def build_status_markdown(
     cfg: dict[str, Any],
     state: dict[str, Any],
@@ -103,6 +95,13 @@ def build_status_markdown(
     if cad_md:
         lines.append(cad_md)
 
+    from . import threads as threads_mod
+
+    thread_rows = state.get("threads") if isinstance(state.get("threads"), list) else []
+    thread_md = threads_mod.format_threads_markdown(cfg, thread_rows)
+    if thread_md:
+        lines.append(thread_md)
+
     lines.append("## 오늘 / 최근\n\n")
     lines.append(
         f"- 오늘 분류(UTC 날짜 기준): **{today_n}**건\n"
@@ -132,42 +131,6 @@ def build_status_markdown(
             "> 참고: 보안 등급은 규칙 엔진 없이 모델 출력에 의존할 수 있음. "
             "backend가 바뀌면 등급 분포가 흔들릴 수 있음.\n\n"
         )
-
-    # Top multi-version hints from filename lineage keys
-    from .lineage import lineage_group_key
-
-    groups: dict[str, list[tuple[str, dict[str, Any]]]] = {}
-    for path, meta in files.items():
-        if not isinstance(meta, dict):
-            continue
-        key = lineage_group_key(os.path.basename(path))
-        if not key:
-            continue
-        groups.setdefault(key, []).append((path, meta))
-    multi = [(k, m) for k, m in groups.items() if len(m) >= 2]
-    multi.sort(key=lambda km: len(km[1]), reverse=True)
-    if multi:
-        lines.append("## 권장 최신본 (다중 버전 그룹 Top)\n\n")
-        for key, members in multi[:8]:
-            newest_path, newest_meta = _newest_in_group(members)
-            sec = format_security_level(str(newest_meta.get("security_level") or ""), cfg)
-            lines.append(
-                f"- `{key}` ({len(members)} files) → "
-                f"`{os.path.basename(newest_path)}`"
-                + (f" · {sec}" if sec else "")
-                + "\n"
-            )
-        lines.append("\n")
-
-    last_rel = state.get("last_related")
-    if isinstance(last_rel, dict) and last_rel.get("paths"):
-        lines.append("## 이 파일과 같이 볼 후보 (최근 분류)\n\n")
-        anchor = str(last_rel.get("anchor") or "")
-        if anchor:
-            lines.append(f"- 앵커: `{os.path.basename(anchor)}`\n")
-        for p in list(last_rel.get("paths") or [])[:6]:
-            lines.append(f"- `{os.path.basename(str(p))}`\n")
-        lines.append("\n")
 
     from . import semantic_diff
 
@@ -227,12 +190,37 @@ def write_status(
     if not status_enabled(cfg):
         return None
     path = resolve_status_path(cfg, report_path)
+    try:
+        from . import threads as threads_mod
+
+        threads_mod.refresh_threads(cfg, state)
+        if save_state is not None:
+            save_state()
+    except Exception:
+        logger.exception("Thread refresh failed")
     body = build_status_markdown(cfg, state, report_path)
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(body)
         reporter.sync_report_html(path)
+        try:
+            from . import threads as threads_mod
+
+            html_path = reporter.html_path_for_report(path)
+            section = threads_mod.format_threads_html(
+                cfg,
+                state.get("threads") if isinstance(state.get("threads"), list) else [],
+            )
+            if section and os.path.isfile(html_path):
+                with open(html_path, encoding="utf-8") as hf:
+                    page = hf.read()
+                patched = threads_mod.inject_threads_html(page, section)
+                if patched != page:
+                    with open(html_path, "w", encoding="utf-8", newline="\n") as hf:
+                        hf.write(patched)
+        except Exception:
+            logger.exception("Status HTML thread details inject failed")
     except OSError as e:
         logger.warning("Status dashboard write failed (%s): %s", path, e)
         return None

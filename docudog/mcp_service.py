@@ -138,6 +138,7 @@ class McpService:
         sec = str(meta.get("security_level") or "")
         return {
             "path": path,
+            "file_id": str(meta.get("file_id") or ""),
             "basename": os.path.basename(path),
             "security_level": sec,
             "security_label": format_security_level(sec, self.cfg),
@@ -159,11 +160,16 @@ class McpService:
         if len(md) > 6000:
             md = md[:6000] + "\n\n…(truncated)"
         payload = mobile_digest.build_mobile_payload(self.cfg, state, report)
+        from . import threads as threads_mod
+
+        thread_rows = state.get("threads") if isinstance(state.get("threads"), list) else []
+        payload["threads_top"] = threads_mod.threads_top_payload(thread_rows, limit=8)
         return {
             "state_path": self.state_path(),
             "report_path": report,
             "status_markdown": md,
             "digest": payload,
+            "threads_top": payload["threads_top"],
             "allowlist_roots": self.allowlist_roots(),
         }
 
@@ -222,27 +228,53 @@ class McpService:
             "results": hits[:lim],
         }
 
-    def get(self, path: str, *, include_excerpt: bool = False) -> dict[str, Any]:
+    def get(
+        self,
+        path: str = "",
+        *,
+        file_id: str = "",
+        include_excerpt: bool = False,
+    ) -> dict[str, Any]:
         state = self.load_state()
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
-        norm = normalize_fs_path(path)
-        meta = files.get(norm)
-        if meta is None:
-            # case-insensitive / slash variants
-            for p, m in files.items():
-                if os.path.normcase(normalize_fs_path(p)) == os.path.normcase(norm):
-                    norm, meta = p, m
-                    break
+        if not files:
+            return {"ok": False, "error": "not_found_in_state", "code": "state_empty", "path": path}
+        norm = ""
+        meta: Any = None
+        fid = (file_id or "").strip()
+        if fid:
+            from . import file_ids as file_ids_mod
+
+            found = file_ids_mod.find_path_by_file_id(files, fid)
+            if found is not None:
+                norm, meta = found, files.get(found)
+        if not isinstance(meta, dict) and (path or "").strip():
+            norm = normalize_fs_path(path)
+            meta = files.get(norm)
+            if meta is None:
+                for p, m in files.items():
+                    if os.path.normcase(normalize_fs_path(p)) == os.path.normcase(norm):
+                        norm, meta = p, m
+                        break
         if not isinstance(meta, dict):
-            return {"ok": False, "error": "not_found_in_state", "path": path}
+            return {
+                "ok": False,
+                "error": "not_found_in_state",
+                "code": "not_found_in_state",
+                "path": path,
+                "file_id": fid,
+            }
         row = self._file_row(norm, meta)
         row["ok"] = True
         row["summary_history"] = list(meta.get("summary_history") or [])[-5:]
         row["in_allowlist"] = self.path_allowed(norm)
+        sha = str(meta.get("sha256") or "")
+        row["sha256"] = sha
         if include_excerpt:
             if not row["in_allowlist"]:
                 row["excerpt"] = None
                 row["excerpt_denied"] = "path_not_in_allowlist"
+                row["code"] = "path_denied"
             else:
                 sec = str(meta.get("security_level") or "")
                 if not self.excerpt_allowed(sec):
@@ -251,9 +283,11 @@ class McpService:
                         f"security_level {sec} exceeds "
                         f"max_security_level_for_excerpt={self.max_excerpt_level()}"
                     )
+                    row["code"] = "excerpt_blocked"
                 elif not os.path.isfile(norm):
                     row["excerpt"] = None
                     row["excerpt_denied"] = "file_missing_on_disk"
+                    row["code"] = "file_missing"
                 else:
                     try:
                         from .router import extract_document_text
@@ -262,16 +296,73 @@ class McpService:
                         if skip or not text:
                             row["excerpt"] = None
                             row["excerpt_denied"] = skip or "empty"
+                            row["truncated"] = False
                         else:
                             max_c = int(
                                 self.mcp_settings().get("max_excerpt_chars", 1200)
                             )
-                            row["excerpt"] = text[: max(0, max_c)]
+                            max_c = max(0, max_c)
+                            row["excerpt"] = text[:max_c]
+                            row["truncated"] = len(text) > max_c
                             row["excerpt_denied"] = None
                     except Exception as e:
                         row["excerpt"] = None
                         row["excerpt_denied"] = str(e)
+                        row["code"] = "excerpt_error"
         return row
+
+    def by_hash(self, sha256: str, *, limit: int = 20) -> dict[str, Any]:
+        needle = str(sha256 or "").strip().lower()
+        if len(needle) < 8:
+            return {"ok": False, "code": "hash_too_short", "error": "need at least 8 hex chars"}
+        state = self.load_state()
+        files = state.get("files") if isinstance(state.get("files"), dict) else {}
+        hits: list[dict[str, Any]] = []
+        for path, meta in files.items():
+            if not isinstance(meta, dict):
+                continue
+            full = str(meta.get("sha256") or "").lower()
+            if not full.startswith(needle) and full != needle:
+                continue
+            if self.mcp_settings().get("enforce_allowlist", True) and not self.path_allowed(
+                path
+            ):
+                continue
+            hits.append(self._file_row(path, meta))
+        lim = max(1, min(100, int(limit)))
+        return {"ok": True, "match_count": len(hits), "results": hits[:lim]}
+
+    def thread(
+        self,
+        thread_id: str = "",
+        path: str = "",
+        file_id: str = "",
+    ) -> dict[str, Any]:
+        state = self.load_state()
+        from . import threads as threads_mod
+
+        rows = state.get("threads") if isinstance(state.get("threads"), list) else []
+        got = threads_mod.find_thread(
+            rows, thread_id=thread_id, path=path, file_id=file_id
+        )
+        if got is None and (path or file_id):
+            resolved = self.get(path=path, file_id=file_id)
+            if resolved.get("ok"):
+                got = threads_mod.find_thread(
+                    rows,
+                    path=str(resolved.get("path") or ""),
+                    file_id=str(resolved.get("file_id") or ""),
+                )
+        if got is None:
+            return {
+                "ok": False,
+                "code": "thread_not_found",
+                "error": "thread_not_found",
+                "thread_id": thread_id,
+                "path": path,
+                "file_id": file_id,
+            }
+        return {"ok": True, "thread": got}
 
     def last_classify(self) -> dict[str, Any]:
         from . import last_classify as lc

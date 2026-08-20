@@ -28,8 +28,9 @@ DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../
 
 ## `DocuDog_state.json`
 
-- 최상위: `version`, `files`, `last_inference_backend`, `last_inference_utc`, 선택 `ops`, `context_bundles`
-- `files[<abs_path>]`: `sha256`, `last_analyzed_utc`, `last_checked_utc`, `summary`, `tags`, `security_level` (`P1`–`P4`), `model_tags`, `model_security_level`, `owner_override`, `inference_source`, `inference_reason`
+- 최상위: `version`, `files`, `last_inference_backend`, `last_inference_utc`, 선택 `ops`, `context_bundles`, `threads`
+- `files[<abs_path>]`: `file_id`(UUIDv4), `sha256`, `last_analyzed_utc`, `last_checked_utc`, `summary`, `tags`, `security_level` (`P1`–`P4`), `model_tags`, `model_security_level`, `owner_override`, `inference_source`, `inference_reason`
+- `threads[]`: status/MCP용 받은편지함 스냅샷 (`id`, `kind` version|conversation|mixed, `members[]`)
 - `ops` (스킵 인사이트): `skip_extract_count`, `skip_extract_sensitive_count`, `skip_extract_by_reason`, `skip_extract_sensitive_recent[]`
 
 **신뢰도:** `security_level`은 규칙 엔진 없이 모델 출력(+선택 owner override). backend가 바뀌면 등급 분포가 흔들릴 수 있음 — status 대시보드에도 경고 문구 있음.
@@ -64,8 +65,8 @@ P1/P2만. Handling hint 셀 예: `… [sharing: internal_only|redact_before_exte
 
 ## `DocuDog_status.md`
 
-오늘 분류 수, **지금 할 일(다이제스트)**, 주기 문서 cadence, P1/P2, 미분류 스킵·민감 키워드, 등급별 backend 분포, 다중버전 그룹 권장 최신본 Top, 최근 유사·맥락 후보, 상세 파일 경로 링크.  
-`.html` 동기화는 report와 동일 로직.
+오늘 분류 수, **지금 할 일(다이제스트)**, 주기 문서 cadence, **최근 대화(스레드)**, P1/P2, 미분류 스킵·민감 키워드, 등급별 backend 분포, 상세 파일 경로 링크.  
+HTML은 `<details>`로 스레드를 접음. MD는 짧은 트리(접기 없음).
 
 ## `DocuDog_mobile_digest.html` / `.json`
 
@@ -90,7 +91,7 @@ hash 변경 재분류 시 `summary_history[]`, `last_change_summary`. `llm_chang
 ## MCP (`tools/docudog_mcp.py`)
 
 외부 AI(Cursor/Claude Desktop)가 산출물을 **재첨부 없이** 질의. 연결: [mcp-connect.md](mcp-connect.md).  
-도구 ↔ 산출물: `docudog_search`/`get` → `DocuDog_state.json`; `docudog_status` → status/digest; `docudog_last_classify` → last_classify JSON.
+도구 ↔ 산출물: `docudog_search`/`get` → `DocuDog_state.json`; `docudog_status` → status/digest + `threads_top`; `docudog_thread` → `state.threads`; `docudog_by_hash` → 동일 SHA; `docudog_last_classify` → last_classify JSON.
 
 ## 규칙 힌트 (`rule_settings`)
 
@@ -117,6 +118,6 @@ hash 변경 재분류 시 `summary_history[]`, `last_change_summary`. `llm_chang
 - `status_settings.enabled`, `mobile_digest_settings.enabled`
 - `cadence_settings` (rules: pattern / weekly|monthly)
 - `idle_settings.min_battery_percent`, `require_charging`, `defer_on_thermal_throttle`
-- `lineage_settings.include_mermaid`, `include_singleton_list`, `slim_intro`
+- `thread_settings` (`enabled`, `max_threads`, `include_conversations`, `min_rel_depth`, `rename_window_hours`)
 - `skip_insight_settings.sensitive_filename_keywords`
 - `security_level_labels`
