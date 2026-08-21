@@ -55,7 +55,7 @@ Use paths from `--print-install` (do not leave placeholders).
 |------|---------|
 | `docudog_ping` | Health + state path |
 | `docudog_status` | Today / actions / digest |
-| `docudog_search` | Corpus search; optional `since`/`until` UTC dates |
+| `docudog_search` | Corpus search; optional `since`/`until` UTC dates; page with `offset` or returned `cursor` |
 | `docudog_get` | One file meta (path or `file_id`, optional excerpt) |
 | `docudog_get_lineage` | Latest version in a thread + member timeline |
 | `docudog_get_context_bundle` | Related paths + time-window bundles |
@@ -72,6 +72,8 @@ Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified 
 - Path allowlist ≈ watch roots + output folder (`enforce_allowlist`, default true)
 - Excerpt capped by `max_security_level_for_excerpt` (default **P4** = least sensitive only)
 - P1/P2 excerpt denial uses `code`: `excerpt_blocked_p1`. Do not re-ask for original text.
+- Tool errors always return `ok: false`, a stable machine-readable `code`, and a human-readable `error`.
+- Search pagination is zero-based: send `offset`, or send the opaque `next_cursor` returned by the previous page. Do not send both.
 - No write tools for user documents
 
 ## Agent checklist

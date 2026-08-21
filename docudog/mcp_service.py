@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from base64 import b64decode, b64encode
 from typing import Any
 
 from . import mobile_digest, semantic_diff, status_dashboard
@@ -14,6 +15,49 @@ from .paths_util import is_unc_path, normalize_fs_path
 from .security_labels import format_security_level
 
 _LEVEL_RANK = {"P4": 0, "P3": 1, "P2": 2, "P1": 3}
+_MAX_PAGE_SIZE = 100
+
+
+def _error(code: str, message: str, **fields: Any) -> dict[str, Any]:
+    """Return the stable MCP error envelope used by every service method."""
+    return {"ok": False, "code": code, "error": message, **fields}
+
+
+def _page_args(limit: int, offset: int, cursor: str) -> tuple[int, int, dict[str, Any] | None]:
+    try:
+        lim = int(limit)
+    except (TypeError, ValueError):
+        return 0, 0, _error("invalid_limit", "limit must be an integer")
+    if lim < 1 or lim > _MAX_PAGE_SIZE:
+        return 0, 0, _error(
+            "invalid_limit", f"limit must be between 1 and {_MAX_PAGE_SIZE}"
+        )
+    try:
+        off = int(offset)
+    except (TypeError, ValueError):
+        return 0, 0, _error("invalid_offset", "offset must be a non-negative integer")
+    if off < 0:
+        return 0, 0, _error("invalid_offset", "offset must be a non-negative integer")
+    token = str(cursor or "").strip()
+    if token:
+        try:
+            decoded = b64decode(token.encode("ascii"), validate=True).decode("ascii")
+            if not decoded.startswith("docudog:"):
+                raise ValueError
+            cursor_offset = int(decoded.split(":", 1)[1])
+        except (ValueError, UnicodeDecodeError, UnicodeEncodeError):
+            return 0, 0, _error("invalid_cursor", "cursor is not a valid DocuDog search cursor")
+        if cursor_offset < 0:
+            return 0, 0, _error("invalid_cursor", "cursor offset must be non-negative")
+        if offset:
+            return 0, 0, _error("pagination_conflict", "use either cursor or offset, not both")
+        off = cursor_offset
+    return lim, off, None
+
+
+def _next_cursor(offset: int) -> str:
+    raw = f"docudog:{offset}".encode("ascii")
+    return b64encode(raw).decode("ascii")
 
 
 def _rank(level: str) -> int:
@@ -173,7 +217,12 @@ class McpService:
         regex: bool = False,
         since: str = "",
         until: str = "",
+        offset: int = 0,
+        cursor: str = "",
     ) -> dict[str, Any]:
+        lim, off, page_error = _page_args(limit, offset, cursor)
+        if page_error is not None:
+            return page_error
         state = self.load_state()
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
         level_u = level.strip().upper()
@@ -182,7 +231,10 @@ class McpService:
         q = query.strip()
         cre: re.Pattern[str] | None = None
         if q and regex:
-            cre = re.compile(q, re.I)
+            try:
+                cre = re.compile(q, re.I)
+            except re.error as e:
+                return _error("invalid_regex", f"query is not valid regex: {e}")
         hits: list[dict[str, Any]] = []
         for path, meta in files.items():
             if not isinstance(meta, dict):
@@ -217,11 +269,18 @@ class McpService:
                     continue
             hits.append(self._file_row(path, meta))
         hits.sort(key=lambda r: r.get("last_analyzed_utc") or "", reverse=True)
-        lim = max(1, min(100, int(limit)))
+        page = hits[off : off + lim]
+        next_offset = off + len(page)
+        has_more = next_offset < len(hits)
         return {
+            "ok": True,
             "match_count": len(hits),
-            "showing": min(lim, len(hits)),
-            "results": hits[:lim],
+            "offset": off,
+            "limit": lim,
+            "showing": len(page),
+            "has_more": has_more,
+            "next_cursor": _next_cursor(next_offset) if has_more else None,
+            "results": page,
         }
 
     def get(
@@ -234,7 +293,7 @@ class McpService:
         state = self.load_state()
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
         if not files:
-            return {"ok": False, "error": "not_found_in_state", "code": "state_empty", "path": path}
+            return _error("state_empty", "no classified files in state", path=path)
         norm = ""
         meta: Any = None
         fid = (file_id or "").strip()
@@ -253,13 +312,12 @@ class McpService:
                         norm, meta = p, m
                         break
         if not isinstance(meta, dict):
-            return {
-                "ok": False,
-                "error": "not_found_in_state",
-                "code": "not_found_in_state",
-                "path": path,
-                "file_id": fid,
-            }
+            return _error(
+                "not_found_in_state",
+                "file was not found in DocuDog state",
+                path=path,
+                file_id=fid,
+            )
         row = self._file_row(norm, meta)
         row["ok"] = True
         row["summary_history"] = list(meta.get("summary_history") or [])[-5:]
@@ -314,7 +372,12 @@ class McpService:
     def by_hash(self, sha256: str, *, limit: int = 20) -> dict[str, Any]:
         needle = str(sha256 or "").strip().lower()
         if len(needle) < 8:
-            return {"ok": False, "code": "hash_too_short", "error": "need at least 8 hex chars"}
+            return _error("hash_too_short", "need at least 8 hex chars")
+        if not re.fullmatch(r"[0-9a-f]+", needle):
+            return _error("invalid_hash", "sha256 must contain hexadecimal characters")
+        lim, _off, page_error = _page_args(limit, 0, "")
+        if page_error is not None:
+            return page_error
         state = self.load_state()
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
         hits: list[dict[str, Any]] = []
@@ -329,7 +392,6 @@ class McpService:
             ):
                 continue
             hits.append(self._file_row(path, meta))
-        lim = max(1, min(100, int(limit)))
         return {"ok": True, "match_count": len(hits), "results": hits[:lim]}
 
     def thread(
@@ -354,14 +416,13 @@ class McpService:
                     file_id=str(resolved.get("file_id") or ""),
                 )
         if got is None:
-            return {
-                "ok": False,
-                "code": "thread_not_found",
-                "error": "thread_not_found",
-                "thread_id": thread_id,
-                "path": path,
-                "file_id": file_id,
-            }
+            return _error(
+                "thread_not_found",
+                "thread was not found",
+                thread_id=thread_id,
+                path=path,
+                file_id=file_id,
+            )
         return {"ok": True, "thread": got}
 
     def get_lineage(self, path: str = "", file_id: str = "") -> dict[str, Any]:
@@ -382,13 +443,12 @@ class McpService:
                     file_id=str(resolved.get("file_id") or ""),
                 )
         if th is None:
-            return {
-                "ok": False,
-                "code": "lineage_not_found",
-                "error": "no version/conversation thread for this file",
-                "path": path,
-                "file_id": file_id,
-            }
+            return _error(
+                "lineage_not_found",
+                "no version/conversation thread for this file",
+                path=path,
+                file_id=file_id,
+            )
         members = list(th.get("members") or [])
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
 
@@ -465,7 +525,7 @@ class McpService:
 
         path = lc.resolve_last_classify_path(self.cfg, self.report_path())
         if not os.path.isfile(path):
-            return {"ok": False, "error": "missing", "path": path}
+            return _error("not_found", "last classification file is missing", path=path)
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return {"ok": True, "path": path, "data": data}

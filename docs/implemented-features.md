@@ -98,7 +98,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 업무 카테고리 | `DocuDog_categories.json` + `category_settings` — 프롬프트 선택지, `state.category_ids` | `docudog/categories.py` |
 | 시맨틱 변경 | 같은 path 해시 변경 + lineage 그룹 **이종 파일명** 직전 vs 최신 한 줄 | `docudog/semantic_diff.py` |
 | UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
-| MCP 서버 | 읽기 전용; lineage/bundle/search 날짜; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1` | `tools/docudog_mcp.py`, `docudog/mcp_service.py` |
+| MCP 서버 | 읽기 전용; lineage/bundle/search 날짜·cursor/offset; 안정적 오류 `code`; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1` | `tools/docudog_mcp.py`, `docudog/mcp_service.py` |
 
 ---
 
@@ -134,6 +134,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `test_threads.py` | file_id rename + version/conversation 스레드 스모크 |
 | `test_pdf_extract.py` | 빈 PDF skip + 텍스트 레이어 추출 스모크 |
 | `docudog_tray.py` | `main.py --tray` 래퍼 |
+| `test_mcp_contract.py` | MCP search pagination·오류 코드 계약 스모크 |
 
 ---
 

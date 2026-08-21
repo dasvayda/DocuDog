@@ -31,10 +31,6 @@
 
 **목표(협업·로컬 유용성):** 팀원이 설치했을 때 실사용 체감이 큰 순으로 검증. 아래는 **미완료만**.
 
-- **260818-03. MCP 에이전트 계약 (에러 코드 · 커서 · 나머지)**  
-  **남은 것:** search 커서/offset, 에러 코드 전면 통일. 날짜 필터·lineage 도구는 `260820-03`(Done).  
-  **출처:** DocBank OpenAPI. 쓰기 HTTP·루프백 데몬은 **안 가져옴**.
-
 - **260818-04. watch settle / min-age (다운로드·Office 잠금)**  
   **출처:** DocBank watched inbox — 크기+mtime 안정 + 선택 최소 파일 나이. 원본은 복사하지 않음.  
   **갭:** 지금은 idle + `file_open_retries`. 파일이 아직 커지는 중(`*.crdownload`, 이어 쓰는 JSONL)은 약함.  
@@ -86,6 +82,7 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 - **260820-03. MCP 1클릭 + lineage/bundle + search 날짜** (`--write-all-mcp`, `docudog_get_lineage` / `get_context_bundle`). SSE 보류. — 2026-08-20
 - **260820-04. 트레이 + P1 토스트** (`--tray`, `--install-startup`, `notify.py`). status 강제 오픈 없음. — 2026-08-20
 - **260820-05. 이종 파일명 한 줄 semantic diff** (`lineage_peer_change_line`, MCP lineage `last_change_summary`). — 2026-08-20
+- **260818-03. MCP 에이전트 계약** (`docudog_search` cursor/offset pagination, stable error `code` envelope, invalid input validation). 쓰기 HTTP·루프백 데몬은 안 가져옴. — 2026-08-21
 - **260818-01. 문서 스레드** (`docudog/threads.py`, status 「최근 대화」, HTML `<details>`, MCP `docudog_thread`): version + conversation/mixed. 새 MD 파일 없음. — 2026-08-18 · **구 #22**
 - **260818-02. 안정 file_id** (`docudog/file_ids.py`): state 레코드 UUID, 동일 SHA+사라진 경로 rename 유지, MCP get `file_id`. — 2026-08-18
 - **260813-01. HWP/HWPX 본문 추출** (`docudog/extract_hwp.py`, `syhwp`): hop/rhwp는 `reference/hop` 참조만; watcher가 `.hwp`/`.hwpx`를 분류 파이프에 태움. 암호화·배포용은 스킵. — 2026-08-13

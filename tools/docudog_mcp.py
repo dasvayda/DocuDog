@@ -195,10 +195,14 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         regex: bool = False,
         since: str = "",
         until: str = "",
+        offset: int = 0,
+        cursor: str = "",
     ) -> str:
         """
         Search classified DocuDog state (path/summary/tags/category).
-        level: optional P1|P2|P3|P4. since/until: UTC YYYY-MM-DD. Not full-text of unscanned files.
+        level: optional P1|P2|P3|P4. since/until: UTC YYYY-MM-DD.
+        Pagination uses either a zero-based offset or the returned opaque cursor.
+        Not full-text of unscanned files.
         """
         return json.dumps(
             svc.search(
@@ -210,6 +214,8 @@ def run_mcp_server(config_dir: str | None = None) -> None:
                 regex=regex,
                 since=since,
                 until=until,
+                offset=offset,
+                cursor=cursor,
             ),
             ensure_ascii=False,
             indent=2,
