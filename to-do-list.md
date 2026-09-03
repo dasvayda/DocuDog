@@ -25,7 +25,7 @@
 
 > **2026-08-18 구현:** `260818-01` 스레드 · `260818-02` file_id. 기획 [`.cursor/plans/threads-file-id.md`](.cursor/plans/threads-file-id.md).
 
-> **2026-08-05 MCP 1차 완료:** `260805-01`. 후속은 `260805-02` · `260818-03`.
+> **2026-08-21 MCP 계약 보강 완료:** `260818-03`을 완료함. 남은 MCP 후속은 `260805-02`(Resources·컨텍스트 팩)임.
 
 > **2026-07-31 구현분은 Done.** ID는 `260731-*` (구 #4~#20). 장문 배경은 git 이력.
 
@@ -41,7 +41,7 @@
   **방향:** `DocuDog_tag_overrides.json`(및 카테고리 JSON)에 revision. 동기 도구·향후 쓰기 경로가 낡은 스냅샷을 덮지 않음. 원본 문서 파일 trash/GC는 **하지 않음**(state tombstone은 스레드와 별도).
 
 - **260805-02. (후속) MCP Resources · 컨텍스트 팩**  
-  도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환. `260818-03` 증명 필드와 같이. 1차 MCP(`260805-01`)만으로 가치 검증되면 보류 가능.  
+  도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환. `260818-03`의 cursor/offset·오류 계약 위에 구현함. 1차 MCP(`260805-01`)만으로 가치 검증되면 보류 가능.  
   **구 ID:** #21b.
 
 **DocBank 검토 요약 (2026-08-18, 이식하지 않을 것)**  

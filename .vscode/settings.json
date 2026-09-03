@@ -1,0 +1,26 @@
+{
+  "git.autoRepositoryDetection": true,
+  "git.ignoredRepositories": [
+    "reference/hop",
+    "reference/rhwp-python",
+    "reference/whichllm"
+  ],
+  "git.repositoryScanMaxDepth": 1,
+  "files.watcherExclude": {
+    "**/models/**": true,
+    "**/*.litertlm": true,
+    "**/*.gguf": true,
+    "**/*.safetensors": true,
+    "**/__pycache__/**": true,
+    "**/.venv/**": true,
+    "**/reference/hop/**": true,
+    "**/reference/rhwp-python/**": true,
+    "**/reference/whichllm/**": true
+  },
+  "search.exclude": {
+    "**/models/**": true,
+    "**/reference/hop/**": true,
+    "**/reference/rhwp-python/**": true,
+    "**/reference/whichllm/**": true
+  }
+}

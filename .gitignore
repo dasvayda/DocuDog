@@ -1,5 +1,8 @@
-# Local model weights and HF cache under repo
-/models/
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
 
 # Local runtime config (copy from config.example.json)
 config.json
@@ -7,22 +10,31 @@ config.json.bak
 config.yml
 config.yaml
 
-# API keys / local secrets
-.env
-.env.local
-*.pem
+# Machine-local Cursor MCP (copy from .cursor/mcp.json.example)
+.cursor/mcp.json
 
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 .venv/
 venv/
+env/
 
-# DocuDog runtime output (local)
-out/
-_main_stderr.txt
+# LLM weights — keep outside the repo (C:\my-own-project\local-llm)
+models/
+*.litertlm
+*.gguf
+*.safetensors
+
+# Nested third-party clones (each has its own .git; do not add as gitlinks)
+reference/
+
+# DocuDog runtime leftovers if generated in-repo
 _main_stdout.txt
+_main_stderr.txt
+out/
 DocuDog_state.json
 DocuDog_main.lock
 classification_report.md
@@ -30,8 +42,8 @@ DocuDog_audit_log.md
 DocuDog_lineage.md
 DocuDog_tag_overrides.json
 
-# Reference subtree (not part of shipped MVP)
-reference/
-
-# Machine-local Cursor MCP (absolute paths from --write-cursor-mcp)
-.cursor/mcp.json
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.swp

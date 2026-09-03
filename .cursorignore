@@ -1,0 +1,18 @@
+﻿# Multi-GB weights — indexing these freezes Cursor
+models/
+*.litertlm
+*.gguf
+*.safetensors
+
+# Nested git clones — extra SCM roots fight the project repo
+reference/hop/
+reference/rhwp-python/
+reference/whichllm/
+
+.venv/
+venv/
+__pycache__/
+.env
+out/
+_main_stdout.txt
+_main_stderr.txt

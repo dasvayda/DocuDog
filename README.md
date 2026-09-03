@@ -81,7 +81,7 @@ hf auth login
 python tools/download_litert_gemma.py
 ```
 
-출력된 `*.litertlm` 경로를 `config.json`의 `model.litert_lm_bundle_path`에 넣습니다.
+기본 저장 위치는 `C:\my-own-project\local-llm\<repo>` 입니다 (`--dest` 또는 `DOCUDOG_LLM_HOME`으로 변경). 출력된 `*.litertlm` 경로를 `config.json`의 `model.litert_lm_bundle_path`에 넣습니다. 모델 파일은 프로젝트 git 저장소 밖에 둡니다.
 
 ### 4. 실행
 

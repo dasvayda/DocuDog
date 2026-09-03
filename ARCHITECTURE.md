@@ -86,8 +86,8 @@ Values below were captured on the reference Windows workstation via `python --ve
 **Bundle (DocuDog defaults):**
 
 - **Hugging Face repo**: `google/gemma-3n-E2B-it-litert-lm` — [model page](https://huggingface.co/google/gemma-3n-E2B-it-litert-lm) (gated; license acceptance + auth required).
-- **Example local file** (from `config.json`): `C:/mydev/DocuDog/models/gemma-3n-E2B-it-litert-lm/gemma-3n-E2B-it-int4.litertlm`
-- **Download helper**: `python tools/download_litert_gemma.py` (default repo id matches the HF repo above).
+- **Example local file** (from `config.json`): `C:/my-own-project/local-llm/gemma-3n-E2B-it-litert-lm/gemma-3n-E2B-it-int4.litertlm`
+- **Download helper**: `python tools/download_litert_gemma.py` — default dest is `C:\my-own-project\local-llm\<repo>` (override with `--dest` or `DOCUDOG_LLM_HOME`). Weights stay **outside** the git repo so Cursor does not index multi-GB files.
 
 ### Version / compatibility notes
 

@@ -125,7 +125,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 | 스크립트 | 역할 |
 |-----------|------|
-| `download_litert_gemma.py` | 기본 HF 기준 LiteRT Gemma 번들 다운로드 안내 |
+| `download_litert_gemma.py` | HF LiteRT Gemma 번들 다운로드. 기본 dest: `C:\my-own-project\local-llm\<repo>` (`DOCUDOG_LLM_HOME` / `--dest`) |
 | `classify_one.py` | 워처·유휴 없이 **한 파일** 추출→분류→stdout + 리포트 (`docudog/single_file.py`) |
 | `regression_smoke.py` | `fixtures/` 복사본으로 분류→hash 스킵→수정→재분류 (mock) |
 | `sync_tag_overrides.py` | 오버라이드 JSON을 state에 재반영(재추론 없음) |

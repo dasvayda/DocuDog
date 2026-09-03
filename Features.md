@@ -91,10 +91,11 @@
 | 기능 | 사용자에게 보이는 것 |
 |------|----------------------|
 | P1/P2 감사 로그 | `DocuDog_audit_log.md`에만 민감 건. 공유 전 확인 같은 handling 힌트. |
+| P1 토스트 | 신규 P1 분류 순간 Windows 토스트(`notify_settings.enabled`). 트레이 있을 때만. |
 | 지금 할 일 | status 상단: 외부 공유 전 확인할 건, 주기 문서 미작성 등. |
 | 미분류 경고 | 암호·스캔 PDF처럼 못 읽은 파일, 파일명에 주민등록·졸업증명 같은 단어. |
 | 주기 문서 | “이번 주 주간보고가 없다”처럼 **없는 파일**을 cadence 규칙으로 알림. |
-| 거버넌스 lint | state와 audit가 어긋난지 점검. 원본 파일은 안 고침. |
+| 거버넌스 lint | state와 audit가 어긋난지 점검(`tools/lint_governance.py` → `DocuDog_lint_report.md`). 원본 파일은 안 고침. |
 
 **아직 아님:** 메일 발송 차단, 실시간 DLP, 파일을 vault로 옮기기.
 
@@ -111,6 +112,7 @@
 | `classification_report.md` | 분류 **이벤트 로그** (한 줄씩 append). |
 | `DocuDog_activity_log.md` | 오늘 워처가 뭘 했는지 (`classify` / `skip_*` / `defer_*`). |
 | `DocuDog_audit_log.md` | 민감 건만. |
+| `DocuDog_lint_report.md` | 거버넌스 lint 결과(`tools/lint_governance.py` 실행 시). |
 | `DocuDog_lineage.md` | 보관·디버그. |
 | `DocuDog_last_classify.json` | 방금 분류 1건 (다른 앱/단축어가 읽기). |
 | `DocuDog_state.json` | 기계용 진실. 사람이 매일 편집할 파일 아님. |
@@ -135,7 +137,9 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 | `docudog_by_hash` | 같은 바이트가 어디에 또 있나. |
 | `docudog_last_classify` / `recent_changes` | 방금 분류, 최근 내용 변화. |
 
-연결: [docs/mcp-connect.md](docs/mcp-connect.md). 읽기 전용. P1/P2 원문을 MCP로 열어 두지 않음.
+**검색·페이지:** `docudog_search` / `thread` / `related`는 `limit`·`offset`·`cursor`로 페이지 매김, 안정적 `code` 오류. 본문 발췌는 기본 P4만 — P1/P2는 `excerpt_blocked_p1`.
+
+**1클릭 연결:** `python tools/docudog_mcp.py --write-all-mcp` (Cursor + Claude Desktop 동시). `--print-install`로 JSON만 확인. 안내 [docs/mcp-connect.md](docs/mcp-connect.md). 읽기 전용. P1/P2 원문을 MCP로 열어 두지 않음.
 
 ---
 
@@ -145,9 +149,12 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 |------|----------------------|
 | 단일 실행 | 같은 DocuDog을 두 번 켜면 이전 인스턴스를 정리. |
 | 설정 | `config.json` + 선택 YAML 오버레이. 비밀은 `.env`. |
+| 산출물 홈 | 기본 `%USERPROFILE%/.docudog/`; 예전 `Documents/DocuDog/` 있으면 복사(삭제 없음). |
 | 시작 점검 | 출력 폴더 쓰기, watch 경로, 모델 서버 연결 — **경고만** (시작을 막지 않음). |
 | 추론 출처 | 리포트·state에 마지막 백엔드(lite_rt / lm_studio / mock 등). |
 | 트레이 | `python main.py --tray` (선택). CLI 워처는 그대로 `python main.py`. |
+| 트레이 일시정지 | 트레이 메뉴에서 추론만 미룸(큐·감시는 계속). `runtime_pause`. |
+| 로컬 코퍼스 검색 | `python tools/search_corpus.py "키워드"` — state 기준 경로·등급·태그 CLI (벡터 아님). |
 
 ---
 

@@ -25,8 +25,9 @@ Optional:
   set HF_TOKEN=hf_...   # token from https://huggingface.co/settings/tokens
   python tools/download_litert_gemma.py --repo google/other-litert-lm-repo
 
-The script writes under ./models/<repo_last_segment>/ and prints the first
-*.litertlm path (if any) for config.json -> model.litert_lm_bundle_path.
+The script writes under C:\\my-own-project\\local-llm\\<repo_last_segment>\\
+(or $DOCUDOG_LLM_HOME) and prints the first *.litertlm path (if any) for
+config.json -> model.litert_lm_bundle_path. Pass --dest to override.
 
 Note: repos like google/gemma-2b are often Safetensors/Transformers weights,
 not LiteRT bundles. DocuDog's litert_lm path must be a .litertlm file; if this
@@ -51,7 +52,7 @@ def main() -> int:
     parser.add_argument(
         "--dest",
         default="",
-        help="Destination folder. Default: <project>/models/<repo name>.",
+        help="Destination folder. Default: %%DOCUDOG_LLM_HOME%%/<repo> or C:\\my-own-project\\local-llm\\<repo>.",
     )
     args = parser.parse_args()
 
@@ -61,9 +62,9 @@ def main() -> int:
         print("Install: pip install huggingface_hub", file=sys.stderr)
         return 1
 
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     repo_tail = args.repo.split("/")[-1]
-    dest = args.dest or os.path.join(project_root, "models", repo_tail)
+    llm_home = os.environ.get("DOCUDOG_LLM_HOME") or r"C:\my-own-project\local-llm"
+    dest = args.dest or os.path.join(llm_home, repo_tail)
     os.makedirs(dest, exist_ok=True)
 
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
