@@ -20,4 +20,4 @@ huggingface_hub>=0.26.0
 
 # MCP server (Cursor / Claude Desktop): python tools/docudog_mcp.py
 # Prefer: pip install --user "mcp[cli]"
-mcp[cli]>=1.2.0
+mcp[cli]>=2.1.0

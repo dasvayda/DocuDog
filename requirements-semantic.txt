@@ -1,0 +1,5 @@
+# Optional local semantic search. Install only when semantic_search.enabled is used:
+#   pip install -r requirements-semantic.txt
+-r requirements.txt
+zvec>=0.7.0
+sentence-transformers>=3.0.0

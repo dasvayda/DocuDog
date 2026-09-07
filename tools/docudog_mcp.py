@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DocuDog MCP server (stdio) + install helpers for Cursor / Claude Desktop.
+DocuDog MCP server (stdio or opt-in Streamable HTTP) + install helpers.
 
 Connect (for humans or coding agents):
   python tools/docudog_mcp.py --print-install
@@ -145,7 +145,8 @@ def _mcp_import_ok() -> bool:
             return False
 
 
-def run_mcp_server(config_dir: str | None = None) -> None:
+def build_mcp_server(config_dir: str | None = None):
+    """Build one read-only tool set for either stdio or Streamable HTTP."""
     try:
         from mcp.server.mcpserver import MCPServer
     except ImportError:
@@ -167,7 +168,7 @@ def run_mcp_server(config_dir: str | None = None) -> None:
         name="docudog",
         instructions=(
             "DocuDog local document governance corpus (read-only). "
-            "Use docudog_search, docudog_get_lineage, docudog_get_context_bundle, "
+            "Use docudog_search, docudog_semantic_search, docudog_get_lineage, docudog_get_context_bundle, "
             "docudog_get, docudog_status. "
             "Do not request raw excerpts for P1/P2; MCP returns metadata only "
             "(code excerpt_blocked_p1). Do not re-ask for original document text. "
@@ -216,6 +217,35 @@ def run_mcp_server(config_dir: str | None = None) -> None:
                 until=until,
                 offset=offset,
                 cursor=cursor,
+            ),
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.tool()
+    def docudog_semantic_search(
+        query: str,
+        level: str = "",
+        tag: str = "",
+        category_id: str = "",
+        limit: int = 10,
+        since: str = "",
+        until: str = "",
+    ) -> str:
+        """
+        Search indexed P3/P4 document chunks by local semantic + full-text retrieval.
+        The feature is optional and disabled by default. Current allowlist and
+        excerpt policy are always enforced before a result is returned.
+        """
+        return json.dumps(
+            svc.semantic_search(
+                query,
+                level=level,
+                tag=tag,
+                category_id=category_id,
+                limit=limit,
+                since=since,
+                until=until,
             ),
             ensure_ascii=False,
             indent=2,
@@ -284,7 +314,59 @@ def run_mcp_server(config_dir: str | None = None) -> None:
             indent=2,
         )
 
-    mcp.run(transport="stdio")
+    return mcp
+
+
+def run_mcp_server(config_dir: str | None = None) -> None:
+    build_mcp_server(config_dir).run(transport="stdio")
+
+
+def run_remote_mcp_server(config_dir: str) -> None:
+    """Serve the same read-only tools over authenticated Streamable HTTP."""
+    from docudog.config_loader import load_app_config
+    from docudog.remote_mcp import (
+        BearerTokenGate,
+        RemoteMcpConfigurationError,
+        resolve_settings,
+    )
+
+    cfg = load_app_config(config_dir)
+    try:
+        settings = resolve_settings(cfg)
+    except RemoteMcpConfigurationError as exc:
+        print(f"DocuDog remote MCP not started: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+    mcp = build_mcp_server(config_dir)
+    if not hasattr(mcp, "streamable_http_app"):
+        print(
+            "Remote MCP requires mcp>=2.1.0. Run: "
+            'pip install --upgrade "mcp[cli]>=2.1.0"',
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    try:
+        import uvicorn
+        from mcp.server.transport_security import TransportSecuritySettings
+    except ImportError:
+        print("Remote MCP requires mcp[cli]>=2.1.0", file=sys.stderr)
+        raise SystemExit(2)
+    transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=settings.allowed_hosts,
+        allowed_origins=settings.allowed_origins,
+    )
+    app = mcp.streamable_http_app(
+        streamable_http_path=settings.path,
+        transport_security=transport_security,
+        host=settings.host,
+    )
+    print(
+        f"DocuDog remote MCP listening at {settings.endpoint} (Bearer token required)",
+        file=sys.stderr,
+    )
+    uvicorn.run(
+        BearerTokenGate(app, settings.token), host=settings.host, port=settings.port
+    )
 
 
 def main() -> int:
@@ -315,6 +397,11 @@ def main() -> int:
         "--write-all-mcp",
         action="store_true",
         help="Write Cursor and Claude Desktop MCP configs",
+    )
+    parser.add_argument(
+        "--remote",
+        action="store_true",
+        help="Run the opt-in authenticated Streamable HTTP gateway",
     )
     args = parser.parse_args()
     cfg_dir = os.path.normpath(os.path.abspath(args.config_dir))
@@ -358,6 +445,10 @@ def main() -> int:
         print(f"Wrote Cursor MCP config: {path}")
         print("Enable the project server 'docudog' in Cursor Settings > MCP.")
         print("Then reload MCP or start a new agent chat and call docudog_ping.")
+        return 0
+
+    if args.remote:
+        run_remote_mcp_server(cfg_dir)
         return 0
 
     run_mcp_server(cfg_dir)

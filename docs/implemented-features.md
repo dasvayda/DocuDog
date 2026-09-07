@@ -27,6 +27,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-07-31 | #17 categories · #4 semantic_history · #5 UNC/retry |
 | 2026-08-05 | #21 DocuDog MCP (`tools/docudog_mcp.py`, docs/mcp-connect.md) |
 | 2026-08-20 | Pivot 1: `.docudog/` 산출물, PDF 텍스트 추출, MCP 1클릭(Claude)+lineage/bundle, 트레이/P1 토스트, 이종 파일 semantic diff |
+| 2026-09-07 | 선택형 Zvec 로컬 하이브리드 본문 검색: P3/P4 chunk index, MCP 정책 게이트, 증분·재빌드 도구 |
+| 2026-09-07 | 선택형 인증 Streamable HTTP MCP 게이트웨이: 로컬 stdio 유지, Bearer 인증·Host/Origin 보호·비루프백 명시 승인 |
 
 ---
 
@@ -53,7 +55,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 주기 문서 cadence | `cadence_settings.rules` — 주/월 부재 감지 → status·digest·`[cadence_miss]` | `docudog/cadence.py` |
 | 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
 | 산출물 홈 | 기본 `%USERPROFILE%/.docudog/`; 예전 `Documents/DocuDog/` 복사 마이그레이션(삭제 없음) | `docudog/artifact_home.py` |
-| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·데이터 폴더. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
+| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·데이터 폴더·인증 원격 MCP 게이트웨이 시작/종료. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
 | P1 토스트 | 신규 P1 분류 시 Windows 토스트 (`notify_settings.enabled`) | `docudog/notify.py` |
 
 ---
@@ -97,8 +99,9 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | Context bundles | 분류 직후 앵커 파일의 FS 이벤트 시각 ±N분·같은 폴더(또는 `context_bundle_extra_directories`) 내 다른 경로를 `state.context_bundles`에 누적; `DocuDog_lineage.md` 표(옵션) | `docudog/context_bundles.py`, `docudog/router.process_file`, `docudog/lineage._append_context_bundles_section` |
 | 업무 카테고리 | `DocuDog_categories.json` + `category_settings` — 프롬프트 선택지, `state.category_ids` | `docudog/categories.py` |
 | 시맨틱 변경 | 같은 path 해시 변경 + lineage 그룹 **이종 파일명** 직전 vs 최신 한 줄 | `docudog/semantic_diff.py` |
+| 선택형 본문 의미 검색 | `semantic_search.enabled=true`일 때만 Zvec FTS+벡터(RRF) 인덱스 생성; 추출 텍스트를 문단 chunk로 색인하고 SHA 변경 시 교체. P1/P2는 기본 미색인, MCP 결과는 allowlist + 발췌 정책을 다시 적용 | `docudog/semantic_index.py`, `docudog/router.py`, `docudog/mcp_service.py` |
 | UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
-| MCP 서버 | 읽기 전용; lineage/bundle/search 날짜·cursor/offset; 안정적 오류 `code`; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1` | `tools/docudog_mcp.py`, `docudog/mcp_service.py` |
+| MCP 서버 | 읽기 전용; lineage/bundle/search 날짜·cursor/offset; 선택형 `docudog_semantic_search`; 안정적 오류 `code`; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1`; 선택형 `--remote` Streamable HTTP 게이트웨이 | `tools/docudog_mcp.py`, `docudog/mcp_service.py`, `docudog/remote_mcp.py` |
 
 ---
 
@@ -125,7 +128,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 | 스크립트 | 역할 |
 |-----------|------|
-| `download_litert_gemma.py` | HF LiteRT Gemma 번들 다운로드. 기본 dest: `C:\my-own-project\local-llm\<repo>` (`DOCUDOG_LLM_HOME` / `--dest`) |
+| `download_litert_gemma.py` | 기본 HF 기준 LiteRT Gemma 번들 다운로드 안내 |
 | `classify_one.py` | 워처·유휴 없이 **한 파일** 추출→분류→stdout + 리포트 (`docudog/single_file.py`) |
 | `regression_smoke.py` | `fixtures/` 복사본으로 분류→hash 스킵→수정→재분류 (mock) |
 | `sync_tag_overrides.py` | 오버라이드 JSON을 state에 재반영(재추론 없음) |
@@ -135,6 +138,9 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `test_pdf_extract.py` | 빈 PDF skip + 텍스트 레이어 추출 스모크 |
 | `docudog_tray.py` | `main.py --tray` 래퍼 |
 | `test_mcp_contract.py` | MCP search pagination·오류 코드 계약 스모크 |
+| `test_remote_mcp.py` | 원격 MCP 기본 비활성·토큰·바인딩·Bearer 게이트 스모크 |
+| `test_semantic_index.py` | 선택형 Zvec 인덱스의 증분 교체·P등급/MCP 게이트 오프라인 스모크 (test-only hashing embedding) |
+| `rebuild_semantic_index.py` | 이미 분류된 파일을 선택형 Zvec 인덱스에 재구축 |
 
 ---
 
@@ -145,7 +151,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 - **보안 등급 P1–P4의 조직 정책 매핑** 또는 키워드·규칙 기반 자동 배정
 - **웹 UI** 또는 중앙 서버로의 자동 동기화(마스터 플랜의 서버 RAG·DLP **미구현**)
 - **스캔 PDF OCR** 또는 암호 PDF 본문 (텍스트 레이어만 추출)
-- **MCP SSE** (`localhost:8765`) — stdio만
+- **무인 원격 MCP 공개** — `remote_mcp_settings.enabled`와 Bearer 토큰을 명시하지 않으면 HTTP listener가 시작되지 않음
 - **커널·이메일 후킹** 수준의 실시간 DLP 차단
 
 ---

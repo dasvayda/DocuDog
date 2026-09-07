@@ -22,7 +22,7 @@
 
 1. 평소처럼 Word/PPT/HWP를 저장함.
 2. PC가 잠깐 비면 DocuDog이 새·바뀐 파일을 분류함.
-3. **먼저 묻는 곳:** Cursor/Claude에서 DocuDog MCP (`docudog_search` / `docudog_get_lineage`).  
+3. **먼저 묻는 곳:** Cursor/Claude에서 DocuDog MCP (`docudog_search` / 선택형 `docudog_semantic_search` / `docudog_get_lineage`).
    기계 산출물은 `%USERPROFILE%/.docudog/` (status.md는 그 안, 열 필요 없음).
 4. P1이면 트레이 토스트가 짧게 뜨고, audit 로그에 남음.
 5. Cursor/Claude에서는 MCP로 “이 과제 최신 덱”처럼 **이미 분류된 코퍼스**를 질의함.
@@ -57,6 +57,7 @@
 |------|----------------------|
 | 본문 추출 | `.txt` `.md` `.docx` `.pptx` `.xlsx` `.hwp` `.hwpx` `.pdf`(텍스트 레이어). 암호·스캔 PDF는 스킵. |
 | 자동 태깅 | 키워드 태그 + 한 줄 요약. |
+| 본문 의미 검색 (선택) | Zvec + 로컬 임베딩을 설치·활성화한 경우 P3/P4 본문을 문단 근거와 함께 자연어로 찾음. MCP 기본 정책은 P4만 반환. |
 | 보안 등급 | P1(매우 민감) ~ P4(일반). 표에는 사람용 라벨이 먼저 보임. |
 | 업무 함 | 팀이 정한 카테고리(계약/회의록 등)로 한 칸에 맞춤. 자유 태그와 별개. |
 | 규칙 힌트 | 주민번호 패턴·“계약서” 같은 키워드가 있으면 등급을 올리도록 모델에 힌트. |
@@ -129,6 +130,7 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 |------|-----------|
 | `docudog_status` | 오늘 뭐가 돌았나, 최근 대화 요약. |
 | `docudog_search` | 태그·P등급·요약으로 찾기. `since`/`until`(UTC 날짜) 가능. |
+| `docudog_semantic_search` | **선택 기능**. P3/P4로 색인된 본문을 의미·전문 검색으로 찾아 경로·문단 위치·짧은 근거를 반환. 현재 allowlist와 P등급 발췌 정책을 통과한 결과만 보임. |
 | `docudog_get` | 한 파일 메타. 경로 또는 `file_id`. 본문 발췌는 기본 P4만. P1/P2는 `excerpt_blocked_p1`. |
 | `docudog_get_lineage` | 그 과제 **최신 경로** + 멤버 타임라인 + 한 줄 변경. |
 | `docudog_get_context_bundle` | 같이 볼 경로 + 시간창 묶음. |
@@ -154,7 +156,7 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 | 추론 출처 | 리포트·state에 마지막 백엔드(lite_rt / lm_studio / mock 등). |
 | 트레이 | `python main.py --tray` (선택). CLI 워처는 그대로 `python main.py`. |
 | 트레이 일시정지 | 트레이 메뉴에서 추론만 미룸(큐·감시는 계속). `runtime_pause`. |
-| 로컬 코퍼스 검색 | `python tools/search_corpus.py "키워드"` — state 기준 경로·등급·태그 CLI (벡터 아님). |
+| 로컬 코퍼스 검색 | `python tools/search_corpus.py "키워드"` — state 기준 경로·등급·태그 CLI. 선택형 Zvec 인덱스는 `python tools/rebuild_semantic_index.py`로 기존 P3/P4 문서를 색인한 뒤 MCP 의미검색에 사용. |
 
 ---
 
@@ -163,11 +165,11 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 사용자 점검 때 기대치를 맞추기 위함.
 
 - 파일 탐색기/웹 드라이브 **대체** 또는 폴더 자동 이동
-- 스캔 PDF OCR, 벡터 의미검색, MCP SSE 서버
+- 스캔 PDF OCR, MCP SSE 서버
 - 메일·메신저로 나가는 파일 **차단**
 - 클라우드 동기화, 다중 사용자 실시간 협업
 - “어제 버전으로 파일 복원” (Shadow Git은 로드맵)
-- 전사 서버 RAG / 벡터 DB 검색 (로컬 메타 검색·MCP만)
+- 전사 서버 RAG / 벡터 DB 검색 (선택형 로컬 본문 검색·MCP만)
 
 ---
 

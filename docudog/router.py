@@ -25,6 +25,7 @@ from . import related_docs
 from . import reporter
 from . import rule_hints
 from . import semantic_diff
+from . import semantic_index
 from . import skip_insights
 from . import file_ids, status_dashboard
 from . import notify
@@ -179,6 +180,16 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _remove_semantic_chunks(config: dict[str, Any], path: str) -> None:
+    """Best-effort cleanup; optional search must never stop the watcher."""
+    if not semantic_index.enabled(config):
+        return
+    try:
+        semantic_index.remove_file(config, path)
+    except Exception:
+        logger.warning("Semantic index cleanup failed for %s", path, exc_info=True)
+
+
 def process_file(
     config: dict[str, Any],
     state: dict[str, Any],
@@ -213,12 +224,14 @@ def process_file(
         return "requeue"
 
     if not passes_file_filters(config, norm):
+        _remove_semantic_chunks(config, norm)
         logger.debug("Skip (filter): %s", norm)
         activity.append_activity(config, report_path, "skip_filter", norm)
         return None
 
     text, skip_reason = extract_document_text(norm, config)
     if skip_reason:
+        _remove_semantic_chunks(config, norm)
         logger.debug("Skip: %s — %s", norm, skip_reason)
         insight = skip_insights.record_extract_skip(state, config, norm, skip_reason)
         save_state()
@@ -246,6 +259,7 @@ def process_file(
             logger.exception("Status dashboard update failed after skip")
         return None
     if not (text and text.strip()):
+        _remove_semantic_chunks(config, norm)
         logger.debug("Skip (empty text): %s", norm)
         activity.append_activity(config, report_path, "skip_empty", norm)
         return None
@@ -456,6 +470,22 @@ def process_file(
             "anchor": norm,
             "paths": related,
             "utc": analyzed_at.isoformat(),
+        }
+    try:
+        index_result = semantic_index.upsert_file(
+            config,
+            path=norm,
+            text=text,
+            metadata=files_state[norm],
+        )
+        files_state[norm]["semantic_index"] = index_result
+    except Exception as exc:
+        # Classification succeeds even if optional packages/models are unavailable.
+        logger.warning("Semantic index update failed for %s: %s", norm, exc)
+        files_state[norm]["semantic_index"] = {
+            "indexed": False,
+            "reason": "error",
+            "error": str(exc)[:240],
         }
     state["last_inference_backend"] = inf_src
     state["last_inference_utc"] = analyzed_at.isoformat()

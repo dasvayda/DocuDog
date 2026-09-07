@@ -11,6 +11,7 @@ from typing import Any
 from . import mobile_digest, semantic_diff, status_dashboard
 from .config_loader import load_app_config
 from . import artifact_home
+from . import semantic_index
 from .paths_util import is_unc_path, normalize_fs_path
 from .security_labels import format_security_level
 
@@ -282,6 +283,48 @@ class McpService:
             "next_cursor": _next_cursor(next_offset) if has_more else None,
             "results": page,
         }
+
+    def semantic_search(
+        self,
+        query: str = "",
+        *,
+        level: str = "",
+        tag: str = "",
+        category_id: str = "",
+        limit: int = 10,
+        since: str = "",
+        until: str = "",
+    ) -> dict[str, Any]:
+        """Search local indexed chunks through the DocuDog policy gateway."""
+        try:
+            payload = semantic_index.search(
+                self.cfg,
+                query,
+                level=level,
+                tag=tag,
+                category_id=category_id,
+                limit=limit,
+                since=since,
+                until=until,
+            )
+        except semantic_index.SemanticIndexError as exc:
+            message = str(exc)
+            code = "semantic_search_disabled" if "disabled" in message else "semantic_search_unavailable"
+            return _error(code, message)
+        safe_rows: list[dict[str, Any]] = []
+        for row in payload.get("results") or []:
+            if not isinstance(row, dict):
+                continue
+            path = str(row.get("path") or "")
+            level_value = str(row.get("security_level") or "")
+            # Do not expose a chunk or its path if current allowlist or excerpt
+            # policy rejects it, even if it was indexed under an older policy.
+            if not self.path_allowed(path) or not self.excerpt_allowed(level_value):
+                continue
+            safe_rows.append(row)
+        payload["results"] = safe_rows
+        payload["match_count"] = len(safe_rows)
+        return payload
 
     def get(
         self,
@@ -555,6 +598,14 @@ class McpService:
 
     def ping(self) -> dict[str, Any]:
         sp = self.state_path()
+        remote = self.cfg.get("remote_mcp_settings")
+        remote = remote if isinstance(remote, dict) else {}
+        remote_host = str(remote.get("host") or "127.0.0.1")
+        try:
+            remote_port = int(remote.get("port", 8765) or 8765)
+        except (TypeError, ValueError):
+            remote_port = 8765
+        remote_path = str(remote.get("path") or "/mcp")
         return {
             "ok": True,
             "service": "docudog",
@@ -565,5 +616,17 @@ class McpService:
             "mcp_settings": {
                 "enforce_allowlist": self.mcp_settings().get("enforce_allowlist", True),
                 "max_security_level_for_excerpt": self.max_excerpt_level(),
+            },
+            "semantic_search": {
+                "enabled": semantic_index.enabled(self.cfg),
+                "index_path": semantic_index.index_path(self.cfg),
+            },
+            "remote_mcp": {
+                "enabled": remote.get("enabled") is True,
+                "endpoint": f"http://{remote_host}:{remote_port}{remote_path}",
+                "host_is_loopback": remote_host in {"127.0.0.1", "::1", "localhost"},
+                "token_source": str(
+                    remote.get("token_env_var") or "DOCUDOG_REMOTE_MCP_TOKEN"
+                ),
             },
         }

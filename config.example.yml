@@ -78,3 +78,31 @@ model:
 # paths:
 #   mobile_digest_path: ""   # default: DocuDog_mobile_digest.html next to report
 #   last_classify_path: ""   # default: DocuDog_last_classify.json
+
+# Optional local Zvec document search. Disabled by default: no Zvec import,
+# model download, or index creation occurs until it is enabled.
+# Install first: pip install -r requirements-semantic.txt
+# semantic_search:
+#   enabled: true
+#   # index_path: "%USERPROFILE%/.docudog/semantic_index"
+#   indexed_levels: ["P3", "P4"]
+#   max_security_level_for_result: "P4"  # align with MCP excerpt policy by default
+#   chunk_max_chars: 1200
+#   max_chunks_per_document: 80
+#   max_total_chunks: 5000
+#   embedding_provider: sentence_transformers
+#   embedding_model: intfloat/multilingual-e5-small
+#   embedding_device: cpu
+
+# Optional remote MCP gateway for Claude Cowork / ChatGPT connectors.
+# Keep disabled unless a trusted tunnel or TLS reverse proxy is configured.
+# The bearer token is read only from DOCUDOG_REMOTE_MCP_TOKEN (never commit it).
+# remote_mcp_settings:
+#   enabled: true
+#   host: 127.0.0.1
+#   port: 8765
+#   path: /mcp
+#   allow_nonlocal_bind: false
+#   allowed_hosts: []
+#   allowed_origins: []
+#   token_env_var: DOCUDOG_REMOTE_MCP_TOKEN

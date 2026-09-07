@@ -70,6 +70,8 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
 
     from . import artifact_home, runtime_pause
 
+    remote_process: dict[str, Any] = {"proc": None}
+
     def _icon_image() -> Image.Image:
         img = Image.new("RGB", (64, 64), (15, 118, 110))
         d = ImageDraw.Draw(img)
@@ -106,12 +108,48 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         except Exception:
             logger.exception("Startup shortcut failed")
 
+    def on_remote_mcp(_icon: Any, _item: Any) -> None:
+        """Toggle the explicitly configured authenticated HTTP MCP process."""
+        proc = remote_process.get("proc")
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            remote_process["proc"] = None
+            logger.info("Remote MCP stopped from tray")
+            return
+        script = os.path.normpath(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "docudog_mcp.py")
+        )
+        try:
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            remote_process["proc"] = subprocess.Popen(
+                [sys.executable, script, "--remote", "--config-dir", config_dir],
+                cwd=config_dir,
+                creationflags=creationflags,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            logger.info("Remote MCP start requested from tray")
+        except OSError:
+            remote_process["proc"] = None
+            logger.exception("Remote MCP start failed")
+
     def on_quit(icon: Any, _item: Any) -> None:
+        proc = remote_process.get("proc")
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
         icon.stop()
         os._exit(0)
 
     menu = pystray.Menu(
         pystray.MenuItem("Write MCP configs", on_mcp),
+        pystray.MenuItem(
+            "Cloud MCP gateway",
+            on_remote_mcp,
+            checked=lambda _: (
+                remote_process.get("proc") is not None
+                and remote_process["proc"].poll() is None
+            ),
+        ),
         pystray.MenuItem("Open data folder", on_open),
         pystray.MenuItem("Install Startup shortcut", on_startup),
         pystray.MenuItem(
