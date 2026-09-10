@@ -597,7 +597,7 @@ def main() -> None:
         )
         if not any(os.path.isdir(r) for r in watch_roots):
             logger.warning(
-                "No existing watch directory — create one or fix config target_directories."
+                "No existing watch directory — enable folder_presets or fix target_directories."
             )
 
         queue_heartbeat_last = 0.0
@@ -654,6 +654,17 @@ def main() -> None:
                             )
                             time.sleep(20.0)
                             break
+                        if outcome == "requeue_settle":
+                            file_queue.put((next_path, file_event_unix))
+                            logger.info(
+                                "Settle wait; will retry file after a short pause (%s)",
+                                next_path,
+                            )
+                            time.sleep(5.0)
+                            if run_once:
+                                logger.info("run_once: item requeued (settle); exiting.")
+                                break
+                            continue
                         if outcome == "requeue":
                             file_queue.put((next_path, file_event_unix))
                             if run_once:

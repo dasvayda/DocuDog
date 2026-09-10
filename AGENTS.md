@@ -13,8 +13,8 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Area | Module | Role |
 |------|--------|------|
 | Entry | `main.py` (repo root) | Config/state, single-instance lock, idle loop, orchestration; imports **`docudog`** |
-| Watch | `docudog/watcher.py` | Windows idle (`GetLastInputInfo`), watchdog queues |
-| Route | `docudog/router.py` | Filters, hash dedupe, extract, call `inference`, reporter |
+| Watch | `docudog/watcher.py`, `docudog/watch_presets.py` | Windows idle (`GetLastInputInfo`), watchdog queues, Desktop/Downloads/Documents presets |
+| Route | `docudog/router.py`, `docudog/file_filters.py` | Document-only filters, hash dedupe, extract, call `inference`, reporter |
 | HWP | `docudog/extract_hwp.py` | `.hwp`/`.hwpx` text via **`syhwp`**; `reference/hop` is the desktop/rhwp format reference only |
 | PDF | `docudog/extract_pdf.py` | Text layer via **`pypdf`**; encrypted/empty (scan) skip |
 | Artifacts | `docudog/artifact_home.py` | Default `%USERPROFILE%/.docudog/`; copy-only migrate from `Documents/DocuDog/` |

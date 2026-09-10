@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from . import file_ids
+from . import watch_presets
 from .lineage import _build_multi_groups, lineage_group_key
 from .security_labels import format_security_level
 
@@ -33,12 +34,7 @@ def _meta_utc(meta: dict[str, Any]) -> str:
 
 
 def _watch_roots(cfg: dict[str, Any]) -> list[str]:
-    watch = cfg.get("watch_settings") or {}
-    out: list[str] = []
-    for d in watch.get("target_directories") or []:
-        s = os.path.normpath(os.path.expandvars(str(d)))
-        out.append(s)
-    return out
+    return watch_presets.resolve_watch_roots(cfg)
 
 
 def _parent_rel_parts(path: str, roots: list[str]) -> int | None:

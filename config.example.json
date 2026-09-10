@@ -1,6 +1,12 @@
 {
   "watch_settings": {
-    "target_directories": ["%USERPROFILE%/Documents/DocuDog_Watch"],
+    "folder_presets": {
+      "desktop": true,
+      "downloads": true,
+      "documents": true,
+      "extra_directories": []
+    },
+    "target_directories": [],
     "exclude_directories": ["node_modules", ".git", "AppData"],
     "event_dedupe_seconds": 2.0,
     "file_open_retries": 3,
@@ -8,6 +14,9 @@
   },
   "file_filters": {
     "allowed_extensions": [".txt", ".md", ".docx", ".xlsx", ".pptx", ".pdf", ".hwp", ".hwpx"],
+    "blocked_extensions": [],
+    "min_age_seconds": 0,
+    "downloads_min_age_seconds": 120,
     "size_limit": {
       "min_bytes": 1024,
       "max_bytes": 52428800

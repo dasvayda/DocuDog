@@ -16,7 +16,18 @@
 # Paths: prefer forward slashes (Windows-friendly paste), e.g.
 #   paths.artifact_home: "%USERPROFILE%/.docudog"
 #   paths.state_path: "%USERPROFILE%/.docudog/DocuDog_state.json"
-# state/report parents are created at startup; watch target_directories are not.
+# state/report parents are created at startup; watch target_directories / folder_presets
+# are not auto-created.
+#
+# Watch where files actually land (Desktop / Downloads / Documents). Extra UNC:
+#   watch_settings:
+#     folder_presets:
+#       desktop: true
+#       downloads: true
+#       documents: true
+#       extra_directories:
+#         - "//server/share/team"
+# Only document extensions are classified. Downloads wait downloads_min_age_seconds.
 
 model:
   enable_litert_lm: false

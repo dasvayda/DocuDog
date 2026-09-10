@@ -31,19 +31,44 @@
 
 **목표(협업·로컬 유용성):** 팀원이 설치했을 때 실사용 체감이 큰 순으로 검증. 아래는 **미완료만**.
 
+> **제품 렌즈 (2026-09-10):** 1차 사용자는 Obsidian/Notion을 **태그·링크 수동 노동(Organizer Fatigue)** 때문에 포기한 지식 노동자. DocuDog은 원본을 정리시키지 않음. 바탕화면·다운로드·공유 폴더에 `_v1` / `_최종_진짜.docx`가 쌓여도, Cursor·Claude Desktop·ChatGPT·Cowork 채팅에서 자연어로 물으면 **최신 맥락**이 나와야 함. 연동은 초보가 `config.json`을 안 열어도 되게.
+
+> **2026-09-10 구현:** `260910-01` Done. Desktop/Downloads/Documents 프리셋, 문서만 분류, Downloads min-age.
+
 > **모바일 기기 계획(구현 보류):** [docs/mobile-device-plan.md](docs/mobile-device-plan.md). PC Watcher를 모바일에 그대로 이식하지 않고, 네이티브 수동 수집·경량 OCR/로컬 LLM·사용자 승인 기반 PC 동반 처리를 후속 단계로 검토한다.
 
 - **260818-04. watch settle / min-age (다운로드·Office 잠금)**  
+  **의존:** Downloads 프리셋(`260910-01`)의 `downloads_min_age_seconds`는 반영됨. 남은 갭은 크기 고정 대기(파일이 아직 커지는 중).  
   **출처:** DocBank watched inbox — 크기+mtime 안정 + 선택 최소 파일 나이. 원본은 복사하지 않음.  
-  **갭:** 지금은 idle + `file_open_retries`. 파일이 아직 커지는 중(`*.crdownload`, 이어 쓰는 JSONL)은 약함.  
-  **방향:** `watch_settings`에 확장자별 settle 초·min age. 분류는 안정된 뒤에만.
+  **갭:** 지금은 idle + `file_open_retries` + Downloads min-age. `*.crdownload`는 확장자 스킵. 이어 쓰는 JSONL 등 허용 확장자가 계속 커지는 경우는 약함.  
+  **방향:** `watch_settings`에 확장자별 settle 초·연속 size 샘플. 분류는 안정된 뒤에만.
+
+- **260910-02. 코파일럿용 최신본 해석 (`_v1` / `_최종_진짜`)**  
+  **갭:** lineage·thread에 `latest_path`는 있으나, 검색 결과가 `_초안`과 `_최종`을 나란히 주면 모델이 아무거나 인용함.  
+  **방향:** MCP `docudog_search` / `docudog_semantic_search`에 `is_latest`·`superseded_by`·한 줄 이유(mtime, thread, 파일명 토큰). 질의 “견적서 최신”용 `docudog_resolve`(또는 get_lineage 확장) 1회 호출로 최신 1건 + 이전 버전 요약을 반환. 파일명 강제 변경 없음.
+
+- **260910-03. 초보 연동 도우미 (Cursor / Claude Desktop / Cowork / ChatGPT)**  
+  **갭:** 로컬 stdio는 `--write-all-mcp`가 있으나 토글·Python 경로에서 막힘. 원격 MCP는 `setx` + 터널 + YAML이라 Cowork/ChatGPT 초보가 못 따라감.  
+  **방향:** 트레이 「연결」: (1) Cursor/Claude는 설정 쓰기 + 다음 클릭 안내 3줄. (2) Cowork/ChatGPT는 토큰 생성(클립보드만, 파일에 비밀 안 씀) → 게이트웨이 시작 → `http://127.0.0.1:8765/mcp` + Bearer 붙여넣기 카드. 터널은 “지원되는 보안 터널 뒤에만” 한 화면 경고. JSON/YAML 수동 편집은 고급 옵션.
+
+- **260910-04. 자연어 한 방 컨텍스트 팩**  
+  **갭:** 에이전트가 `search` → `get` → `get_lineage`를 알아서 호출해야 해서, 초보 채팅에서는 도구를 빼먹거나 옛 버전을 붙임.  
+  **방향:** `260805-02`를 이 렌즈로 구체화. `docudog_context_pack(query)`가 검색 Top-K 중 **최신본 우선**, P정책 통과 발췌, thread 한 줄, “이 파일은 초안/최신”을 짧은 마크다운으로 반환. 클라이언트용 고정 프롬프트/스킬 한 장(도구 이름 몰라도 “DocuDog에서 찾아봐”). DocuDog 자체 채팅 UI는 만들지 않음.
+
+- **260910-05. 첫 실행 제로설정 (JSON 안 열기)**  
+  **갭:** Organizer Fatigue 사용자는 `config.json`·watch 경로·모델 백엔드를 안 만짐. 설치 후 “돌아가는지”를 모름.  
+  **방향:** `--tray` 첫 실행 마법사: 폴더 프리셋(`260910-01`) → mock 또는 이미 있는 백엔드로 샘플 1건 분류 → `docudog_ping`이 초록인지 트레이에 표시. 실패는 “Python/MCP 토글” 한 줄. 웹 온보딩 없음.
+
+- **260910-06. 공유 폴더 최신 시각을 MCP에 명시**  
+  **갭:** UNC 감시는 있으나, 코파일럿이 `last_analyzed_utc`만 보면 NAS에서 방금 덮어쓴 파일을 낡은 분류본으로 말할 수 있음. 다중 PC 실시간 동기화는 하지 않음(제품 범위 밖).  
+  **방향:** 검색/resolve 결과에 `file_mtime_utc` vs `last_analyzed_utc`, `stale_classification` 플래그. “다시 분류 대기 중”을 한 줄로. 원본 복사·팀 서버 없음.
 
 - **260818-05. 태그 오버라이드 revision (에이전트 덮어쓰기 방지)**  
   **출처:** DocBank If-Match / stale revision → 412.  
   **방향:** `DocuDog_tag_overrides.json`(및 카테고리 JSON)에 revision. 동기 도구·향후 쓰기 경로가 낡은 스냅샷을 덮지 않음. 원본 문서 파일 trash/GC는 **하지 않음**(state tombstone은 스레드와 별도).
 
 - **260805-02. (후속) MCP Resources · 컨텍스트 팩**  
-  도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환. `260818-03`의 cursor/offset·오류 계약 위에 구현함. 1차 MCP(`260805-01`)만으로 가치 검증되면 보류 가능.  
+  도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환. 질의 UX는 `260910-04`와 같이 구현함. `260818-03`의 cursor/offset·오류 계약 위에 구현함.  
   **구 ID:** #21b.
 
 **DocBank 검토 요약 (2026-08-18, 이식하지 않을 것)**  
@@ -54,6 +79,9 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 ### 보류 (Deferred)
 
 나중에 구현 검토. **모델 A/B 비교·벤치** 용도는 MVP 본류가 아니므로 여기 보관합니다.
+
+- **260910-D. Notion/Obsidian vault 양방향 동기 · 그래프 UI**  
+  1차 사용자가 그 툴을 버린 이유가 **정리 노동**임. vault 미러, 백링크 강제, 웹 그래프는 같은 피로를 재현함. 코파일럿 MCP로 최신본을 찾는 쪽이 제품. 필요하면 나중에 **읽기 전용 export**만 재검토.
 
 - **260818-D. DocBank CAS / 검증 백업 / Shadow Git**  
   분류된 고가치 스냅샷·해시 검증. 폴더 미러·sync-and-share 아님. master-plan Corporate Shadow Git 단계.
@@ -79,6 +107,7 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 
 ### 완료 (Done)
 
+- **260910-01. 바탕화면·다운로드·공유 폴더 프리셋 + 문서만 필터**: `folder_presets`(Desktop/Downloads/Documents, UNC는 `extra_directories`), 트레이 Watch folders, 설치파일·이미지·`~$`/`.crdownload` 스킵, Downloads `downloads_min_age_seconds`. 원본 이동 없음. — 2026-09-10
 - **260907-01. 로컬·클라우드 LLM 공용 MCP 게이트웨이**: 기존 stdio MCP를 유지하면서 선택형 Streamable HTTP(`/mcp`) 실행 경로를 추가함. 기본 비활성, 환경변수 Bearer 토큰, loopback 기본 바인딩, Host/Origin 보호, P등급·allowlist·발췌 정책 재사용. — 2026-09-07
 - **260903-01. 선택형 로컬 하이브리드 의미검색 (Zvec)** (`semantic_search.enabled`, 기본 false): Zvec FTS+벡터 RRF 문단 인덱스, SHA 증분 교체·총 청크 상한, P1/P2 미색인, allowlist/발췌 정책 MCP 게이트, `docudog_semantic_search`, 기존 코퍼스 재빌드·오프라인 smoke를 추가함. 선택 의존성은 `requirements-semantic.txt`. — 2026-09-07
 - **260820-01. `.docudog/` 산출물 격리** (`artifact_home`, 기본 `%USERPROFILE%/.docudog/`, 레거시 복사만). — 2026-08-20

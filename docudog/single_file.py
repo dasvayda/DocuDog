@@ -70,6 +70,7 @@ def process_single_path(
             save_state=save_state,
             file_event_unix=time.time(),
             get_fs_event_snapshot=None,
+            skip_settle=True,
         )
         return SingleFileResult(path=norm, outcome=SingleFileOutcome.SKIPPED_EXTRACT)
     if not (text and text.strip()):
@@ -91,6 +92,7 @@ def process_single_path(
         save_state=save_state,
         file_event_unix=time.time(),
         get_fs_event_snapshot=None,
+        skip_settle=True,
     )
 
     if raw == "requeue":

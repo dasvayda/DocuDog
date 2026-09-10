@@ -37,7 +37,8 @@
 
 | 기능 | 사용자에게 보이는 것 |
 |------|----------------------|
-| 폴더 감시 | `watch_settings.target_directories` 아래 생성·수정이 큐에 쌓임. 시작 시 기존 파일도 한 번 훑음. |
+| 폴더 감시 | Desktop / Downloads / Documents 프리셋(`watch_settings.folder_presets`) + 추가 경로. 트레이에서 켜고 끔(재시작 후 적용). 원본은 그대로 둠. |
+| 문서만 분류 | 허용 확장자(docx/pdf/hwp 등)만. 설치파일·이미지·압축·Office `~$` 잠금·다운로드 중 `.crdownload`는 스킵. Downloads는 잠깐 기다려서 덜 받은 파일을 안 읽음. |
 | 유휴 처리 | 타이핑 중이면 미루고, 입력이 끊기면 처리. 프로세스 우선순위는 낮춤. |
 | 배터리 게이트 | 충전/잔량 조건이 안 되면 추론만 미룸. 큐는 유지. |
 | 같은 내용 스킵 | 파일이 안 바뀌었으면(SHA-256 동일) LLM을 다시 안 돌림. |
@@ -45,7 +46,7 @@
 | 한 건만 돌리기 | `python main.py --file 경로` — 워처 없이 그 파일만 분류. |
 | 트레이 (선택) | `python main.py --tray`. MCP 설정 쓰기, `.docudog` 열기, 일시정지. status.md는 안 염. `--install-startup`으로 시작프로그램 바로가기. |
 
-**아직 아님:** 메일 첨부·USB를 OS 커널에서 가로채기, 파일이 아직 다운로드 중인 settle 대기.
+**아직 아님:** 메일 첨부·USB를 OS 커널에서 가로채기. 파일이 계속 커지는 중의 size-settle은 일부만(Downloads min-age + `.crdownload` 스킵).
 
 ---
 

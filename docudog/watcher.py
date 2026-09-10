@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import paths_util
+from . import file_filters, paths_util, watch_presets
 
 logger = logging.getLogger(__name__)
 
@@ -68,22 +68,6 @@ def _path_matches_exclude(normalized_path: str, exclude_dirs: Iterable[str]) -> 
     return False
 
 
-def _passes_quick_filter(
-    path: str,
-    allowed_exts: set[str],
-    min_bytes: int,
-    max_bytes: int,
-) -> bool:
-    ext = Path(path).suffix.lower()
-    if ext not in allowed_exts:
-        return False
-    try:
-        size = os.path.getsize(path)
-    except OSError:
-        return False
-    return min_bytes <= size <= max_bytes
-
-
 class _DocuDogWatchHandler(FileSystemEventHandler):
     """Enqueue created/modified files that pass quick filters."""
 
@@ -91,9 +75,7 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
         self,
         file_queue: queue.Queue[tuple[str, float]],
         exclude_directories: list[str],
-        allowed_extensions: set[str],
-        min_bytes: int,
-        max_bytes: int,
+        config: dict[str, Any],
         on_seen: Callable[[str, float], None] | None = None,
         *,
         dedupe_seconds: float = 2.0,
@@ -101,9 +83,7 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
         super().__init__()
         self._file_queue = file_queue
         self._exclude_directories = exclude_directories
-        self._allowed_extensions = allowed_extensions
-        self._min_bytes = min_bytes
-        self._max_bytes = max_bytes
+        self._config = config
         self._on_seen = on_seen
         self._dedupe_seconds = max(0.0, float(dedupe_seconds))
         self._recent: dict[str, float] = {}
@@ -119,9 +99,7 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
             return
         if not os.path.isfile(normalized):
             return
-        if not _passes_quick_filter(
-            normalized, self._allowed_extensions, self._min_bytes, self._max_bytes
-        ):
+        if not file_filters.passes_file_filters(self._config, normalized):
             return
         t = time.time()
         if self._dedupe_seconds > 0:
@@ -151,20 +129,8 @@ class _DocuDogWatchHandler(FileSystemEventHandler):
 
 
 def expand_watch_dirs(config: dict[str, Any]) -> list[str]:
-    """Return absolute watch roots from config (expandvars + UNC-safe normalize)."""
-    watch = config.get("watch_settings", {})
-    raw_dirs: list[str] = watch.get("target_directories", [])
-    out: list[str] = []
-    for d in raw_dirs:
-        expanded = paths_util.normalize_fs_path(str(d))
-        out.append(expanded)
-        if paths_util.is_unc_path(expanded):
-            logger.info(
-                "UNC/NAS watch root configured: %s "
-                "(single state/report; concurrent writers may hit sharing locks — retries apply)",
-                expanded,
-            )
-    return out
+    """Return absolute watch roots (folder presets + extra UNC + target_directories)."""
+    return watch_presets.resolve_watch_roots(config)
 
 
 def start_observer(
@@ -175,18 +141,13 @@ def start_observer(
     """Start recursive watchdog observers for all target_directories."""
     watch = config.get("watch_settings", {})
     exclude = list(watch.get("exclude_directories", []))
-    filters = config.get("file_filters", {})
-    exts = {e.lower() for e in filters.get("allowed_extensions", [])}
-    size = filters.get("size_limit", {})
-    min_b = int(size.get("min_bytes", 0))
-    max_b = int(size.get("max_bytes", 2**62))
     try:
         dedupe = float(watch.get("event_dedupe_seconds", 2.0))
     except (TypeError, ValueError):
         dedupe = 2.0
 
     handler = _DocuDogWatchHandler(
-        file_queue, exclude, exts, min_b, max_b, on_seen, dedupe_seconds=dedupe
+        file_queue, exclude, config, on_seen, dedupe_seconds=dedupe
     )
     observer = Observer()
 
@@ -217,11 +178,6 @@ def seed_queue_from_existing_files(
     watch = config.get("watch_settings", {})
     exclude = list(watch.get("exclude_directories", []))
     exclude_lower = {e.lower() for e in exclude}
-    filters = config.get("file_filters", {})
-    exts = {e.lower() for e in filters.get("allowed_extensions", [])}
-    size = filters.get("size_limit", {})
-    min_b = int(size.get("min_bytes", 0))
-    max_b = int(size.get("max_bytes", 2**62))
 
     count = 0
     for root in expand_watch_dirs(config):
@@ -243,7 +199,7 @@ def seed_queue_from_existing_files(
                     continue
                 if not os.path.isfile(norm):
                     continue
-                if not _passes_quick_filter(norm, exts, min_b, max_b):
+                if not file_filters.passes_file_filters(config, norm):
                     continue
                 t = time.time()
                 if on_seen is not None:
@@ -256,8 +212,7 @@ def seed_queue_from_existing_files(
         logger.info("Startup scan: %s file(s) enqueued for analysis.", count)
     else:
         logger.debug(
-            "Startup scan: no files matched (check path, extensions, size >= %s bytes).",
-            min_b,
+            "Startup scan: no files matched (check watch folders, document extensions, size)."
         )
     return count
 

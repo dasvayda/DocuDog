@@ -68,7 +68,7 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         logger.warning("Tray needs pystray and pillow: pip install pystray pillow")
         return
 
-    from . import artifact_home, runtime_pause
+    from . import artifact_home, runtime_pause, watch_presets
 
     remote_process: dict[str, Any] = {"proc": None}
 
@@ -108,6 +108,33 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         except Exception:
             logger.exception("Startup shortcut failed")
 
+    preset_state = {
+        key: watch_presets.preset_enabled(cfg, key) for key in watch_presets.PRESET_IDS
+    }
+
+    def _toggle_preset(preset_id: str) -> Any:
+        def _on(_icon: Any, _item: Any) -> None:
+            new_val = not preset_state[preset_id]
+            try:
+                watch_presets.persist_folder_preset(config_dir, preset_id, new_val)
+            except Exception:
+                logger.exception("Could not save watch preset %s", preset_id)
+                return
+            preset_state[preset_id] = new_val
+            cfg.setdefault("watch_settings", {})
+            presets = cfg["watch_settings"].setdefault("folder_presets", {})
+            if not isinstance(presets, dict):
+                presets = {}
+                cfg["watch_settings"]["folder_presets"] = presets
+            presets[preset_id] = new_val
+            logger.info(
+                "Watch %s is now %s. Restart DocuDog to apply folder watching.",
+                preset_id,
+                "on" if new_val else "off",
+            )
+
+        return _on
+
     def on_remote_mcp(_icon: Any, _item: Any) -> None:
         """Toggle the explicitly configured authenticated HTTP MCP process."""
         proc = remote_process.get("proc")
@@ -142,6 +169,26 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
 
     menu = pystray.Menu(
         pystray.MenuItem("Write MCP configs", on_mcp),
+        pystray.MenuItem(
+            "Watch folders",
+            pystray.Menu(
+                pystray.MenuItem(
+                    "Desktop",
+                    _toggle_preset("desktop"),
+                    checked=lambda _: preset_state["desktop"],
+                ),
+                pystray.MenuItem(
+                    "Downloads",
+                    _toggle_preset("downloads"),
+                    checked=lambda _: preset_state["downloads"],
+                ),
+                pystray.MenuItem(
+                    "Documents",
+                    _toggle_preset("documents"),
+                    checked=lambda _: preset_state["documents"],
+                ),
+            ),
+        ),
         pystray.MenuItem(
             "Cloud MCP gateway",
             on_remote_mcp,

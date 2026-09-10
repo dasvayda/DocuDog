@@ -16,6 +16,7 @@ from . import categories
 from . import context_bundles
 from . import extract_hwp
 from . import extract_pdf
+from . import file_filters
 from . import inference
 from . import last_classify
 from . import owner_tags
@@ -41,19 +42,7 @@ def _normalize_path(path: str) -> str:
 
 
 def passes_file_filters(config: dict[str, Any], path: str) -> bool:
-    filters = config.get("file_filters", {})
-    exts = {e.lower() for e in filters.get("allowed_extensions", [])}
-    ext = Path(path).suffix.lower()
-    if ext not in exts:
-        return False
-    size = filters.get("size_limit", {})
-    min_b = int(size.get("min_bytes", 0))
-    max_b = int(size.get("max_bytes", 2**62))
-    try:
-        sz = os.path.getsize(path)
-    except OSError:
-        return False
-    return min_b <= sz <= max_b
+    return file_filters.passes_file_filters(config, path)
 
 
 def sha256_file(
@@ -201,6 +190,7 @@ def process_file(
     save_state: Callable[[], None],
     file_event_unix: float | None = None,
     get_fs_event_snapshot: Callable[[], list[tuple[str, float]]] | None = None,
+    skip_settle: bool = False,
 ) -> str | None:
     """
     Full routing for one file: filters, extract, hash, dedupe, inference, report.
@@ -211,6 +201,7 @@ def process_file(
         None — finished handling (including filters/skips and successful analysis).
         "requeue" — same path should be enqueued again (user active / yielded).
         "requeue_power" — power/battery gate; requeue and pause drain briefly.
+        "requeue_settle" — file still too new (Downloads min-age); requeue after a short pause.
 
     Yield / pause: if the user becomes active during streaming inference, we stop
     without writing partial results; caller should requeue the path.
@@ -228,6 +219,15 @@ def process_file(
         logger.debug("Skip (filter): %s", norm)
         activity.append_activity(config, report_path, "skip_filter", norm)
         return None
+
+    if not skip_settle:
+        settle_reason = file_filters.settle_wait_reason(config, norm)
+        if settle_reason:
+            logger.info("Defer (settle %s): %s", settle_reason, norm)
+            activity.append_activity(
+                config, report_path, "defer_settle", f"{norm} | {settle_reason}"
+            )
+            return "requeue_settle"
 
     text, skip_reason = extract_document_text(norm, config)
     if skip_reason:

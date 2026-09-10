@@ -12,6 +12,7 @@ from . import mobile_digest, semantic_diff, status_dashboard
 from .config_loader import load_app_config
 from . import artifact_home
 from . import semantic_index
+from . import watch_presets
 from .paths_util import is_unc_path, normalize_fs_path
 from .security_labels import format_security_level
 
@@ -89,10 +90,7 @@ class McpService:
     def allowlist_roots(self) -> list[str]:
         ms = self.mcp_settings()
         extra = ms.get("extra_allow_directories")
-        roots: list[str] = []
-        watch = self.cfg.get("watch_settings") or {}
-        for d in watch.get("target_directories") or []:
-            roots.append(normalize_fs_path(os.path.expandvars(str(d))))
+        roots: list[str] = list(watch_presets.resolve_watch_roots(self.cfg))
         if isinstance(extra, list):
             for d in extra:
                 roots.append(normalize_fs_path(os.path.expandvars(str(d))))

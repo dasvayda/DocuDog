@@ -67,7 +67,8 @@ copy config.example.json config.json
 
 `config.json`에서 최소한 다음을 맞춥니다.
 
-- `watch_settings.target_directories` — 감시할 폴더
+- `watch_settings.folder_presets` — Desktop/Downloads/Documents 켜기, 공유폴더는 `extra_directories`
+- `watch_settings.target_directories` — 추가 감시 폴더(프리셋과 합쳐짐)
 - `paths.state_path`, `paths.report_path` — state·리포트 저장 위치
 - `model.*` — 추론 백엔드 (아래 **모델 백엔드** 참고)
 

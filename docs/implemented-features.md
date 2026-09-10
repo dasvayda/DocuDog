@@ -29,6 +29,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-08-20 | Pivot 1: `.docudog/` 산출물, PDF 텍스트 추출, MCP 1클릭(Claude)+lineage/bundle, 트레이/P1 토스트, 이종 파일 semantic diff |
 | 2026-09-07 | 선택형 Zvec 로컬 하이브리드 본문 검색: P3/P4 chunk index, MCP 정책 게이트, 증분·재빌드 도구 |
 | 2026-09-07 | 선택형 인증 Streamable HTTP MCP 게이트웨이: 로컬 stdio 유지, Bearer 인증·Host/Origin 보호·비루프백 명시 승인 |
+| 2026-09-10 | 감시 폴더 프리셋(Desktop/Downloads/Documents) + 문서만 통과하는 junk 필터·Downloads min-age settle |
 
 ---
 
@@ -55,7 +56,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 주기 문서 cadence | `cadence_settings.rules` — 주/월 부재 감지 → status·digest·`[cadence_miss]` | `docudog/cadence.py` |
 | 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
 | 산출물 홈 | 기본 `%USERPROFILE%/.docudog/`; 예전 `Documents/DocuDog/` 복사 마이그레이션(삭제 없음) | `docudog/artifact_home.py` |
-| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·데이터 폴더·인증 원격 MCP 게이트웨이 시작/종료. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
+| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·**Watch folders** 프리셋·데이터 폴더·인증 원격 MCP 게이트웨이 시작/종료. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
 | P1 토스트 | 신규 P1 분류 시 Windows 토스트 (`notify_settings.enabled`) | `docudog/notify.py` |
 
 ---
@@ -64,7 +65,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 | 기능 | 설명 | 모듈 |
 |------|------|------|
-| 디렉터리 감시 | `watchdog` 기반, 설정 루트·제외 디렉터리 | `docudog/watcher.py` |
+| 디렉터리 감시 | `watchdog` + `folder_presets`(Desktop/Downloads/Documents) + `extra_directories`/`target_directories` | `docudog/watcher.py`, `docudog/watch_presets.py` |
 | 큐 페이로드 | `(절대 경로, 이벤트 Unix 시각)`; 선택 `on_seen` 콜백으로 링 버퍼 등 부가 기록 | `docudog/watcher.py` |
 | 기존 파일 시드 | 시작 시 조건 맞는 파일 큐 적재 | `docudog/watcher.seed_queue_from_existing_files` |
 | Windows 유휴 | `GetLastInputInfo` 기반 초 단위 유휴(비-Windows는 경고 후 0초로 가정) | `docudog/watcher.seconds_since_last_input` |
@@ -75,7 +76,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 
 | 기능 | 설명 | 모듈 |
 |------|------|------|
-| 확장자·크기 필터 | `file_filters` | `docudog/router.passes_file_filters` |
+| 확장자·크기 필터 | 문서 allowlist + 설치파일/이미지 등 blocklist, `~$`/`.crdownload` 스킵, Downloads `downloads_min_age_seconds` | `docudog/file_filters.py`, `docudog/router.passes_file_filters` |
 | 추출 지원 형식 | `.txt` `.md` `.docx` `.pptx` `.xlsx` `.hwp` `.hwpx` `.pdf`(텍스트 레이어; 암호·빈 스캔은 스킵) | `docudog/router`, `extract_hwp`, `extract_pdf` |
 | 중복·재분류 방지 | 파일 전체 SHA-256; 동일 해시면 LLM 생략·`last_checked_utc` 갱신 | `docudog/router.process_file` |
 | 소유자 오버라이드 | `DocuDog_tag_overrides.json`로 태그·`security_level` 우선 | `docudog/owner_tags.py` |
@@ -139,6 +140,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `docudog_tray.py` | `main.py --tray` 래퍼 |
 | `test_mcp_contract.py` | MCP search pagination·오류 코드 계약 스모크 |
 | `test_remote_mcp.py` | 원격 MCP 기본 비활성·토큰·바인딩·Bearer 게이트 스모크 |
+| `test_watch_presets.py` | Desktop/Downloads 프리셋 저장 + 문서만 통과·exe/jpg/`~$`/crdownload 스킵 + Downloads min-age |
 | `test_semantic_index.py` | 선택형 Zvec 인덱스의 증분 교체·P등급/MCP 게이트 오프라인 스모크 (test-only hashing embedding) |
 | `rebuild_semantic_index.py` | 이미 분류된 파일을 선택형 Zvec 인덱스에 재구축 |
 
