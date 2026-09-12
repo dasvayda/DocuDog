@@ -34,6 +34,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
 | Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); lineage stays archive |
 | Output spec (readers) | [docs/docudog-output-spec.md](docs/docudog-output-spec.md) | How agents/scripts consume local artifacts (not this repo's `AGENTS.md`) |
+| RAM / Cursor checklist | [docs/memory-checklist.md](docs/memory-checklist.md) | Other-PC diagnosis: Zvec, MCP, LiteRT, Agent list vs open workspace |
 | Config | `docudog/config_loader.py`, `main.load_config()`, `config.json` | Defaults + YAML overlay (`config.yml` / `config.yaml`): watch roots, filters, paths, `model.*`, `audit_settings`, `lineage_settings` |
 
 **Paths in config:** default artifacts live in `%USERPROFILE%/.docudog/` (hidden), not the watch folder. Prefer forward slashes in YAML/JSON. Watch roots are **not** auto-created.

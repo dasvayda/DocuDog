@@ -28,6 +28,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-08-05 | #21 DocuDog MCP (`tools/docudog_mcp.py`, docs/mcp-connect.md) |
 | 2026-08-20 | Pivot 1: `.docudog/` 산출물, PDF 텍스트 추출, MCP 1클릭(Claude)+lineage/bundle, 트레이/P1 토스트, 이종 파일 semantic diff |
 | 2026-09-07 | 선택형 Zvec 로컬 하이브리드 본문 검색: P3/P4 chunk index, MCP 정책 게이트, 증분·재빌드 도구 |
+| 2026-09-12 | Cursor/DocuDog RAM 점검 목록 (`docs/memory-checklist.md`) — 기기별 config·MCP·Zvec |
 | 2026-09-07 | 선택형 인증 Streamable HTTP MCP 게이트웨이: 로컬 stdio 유지, Bearer 인증·Host/Origin 보호·비루프백 명시 승인 |
 | 2026-09-10 | 감시 폴더 프리셋(Desktop/Downloads/Documents) + 문서만 통과하는 junk 필터·Downloads min-age settle |
 
