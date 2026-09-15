@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import watch_presets
+from . import artifact_home, watch_presets
 
 # Office/Hangul/PDF text we can extract. Images and installers stay out.
 DEFAULT_ALLOWED_EXTENSIONS: tuple[str, ...] = (
@@ -134,6 +134,8 @@ def passes_file_filters(config: dict[str, Any], path: str) -> bool:
     filters = config.get("file_filters", {})
     if not isinstance(filters, dict):
         filters = {}
+    if artifact_home.path_is_artifact(config, path):
+        return False
     name = Path(path).name
     name_lower = name.lower()
     if name_lower in SKIP_FILENAMES:

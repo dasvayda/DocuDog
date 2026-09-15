@@ -75,13 +75,47 @@ def build_status_markdown(
     p2 = level_counts.get("P2", 0)
     last_backend = str(state.get("last_inference_backend") or "(none)")
     last_utc = str(state.get("last_inference_utc") or "")
+    model_cfg = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
+    mockish = bool(model_cfg.get("use_mock", True)) or last_backend in ("(none)", "mock", "")
+    mode_line = (
+        "연습 모드 (mock) — 진짜 분석이 아님"
+        if mockish
+        else f"모델 `{last_backend}`"
+    )
+    from . import runtime_pause
+
+    pause_bit = "일시정지" if runtime_pause.is_paused() else "실행 중(이 파일을 쓸 때)"
 
     lines: list[str] = [
         "# DocuDog status\n",
         "\n",
-        "_현황 대시보드 (짧게·자주 갱신). 상세 lineage/전체 표는 아래 링크._\n",
+        "## 건강\n\n",
+        f"- 상태: **{pause_bit}** (트레이 **Open status page** 가 지금 화면)\n",
+        f"- 마지막 분류: `{last_utc or '(아직 없음)'}`\n",
+        f"- 모드: {mode_line}\n\n",
+        "_현황 스냅샷. 상세 lineage/전체 표는 아래 링크._\n",
         "\n",
     ]
+    sens_items: list[tuple[str, dict[str, Any]]] = []
+    for path, meta in files.items():
+        if not isinstance(meta, dict):
+            continue
+        sec = str(meta.get("security_level") or "").upper()
+        if sec in ("P1", "P2"):
+            sens_items.append((str(path), meta))
+    if sens_items:
+        sens_items.sort(
+            key=lambda pm: str(pm[1].get("last_analyzed_utc") or ""),
+            reverse=True,
+        )
+        lines.append("## 민감 (제목만)\n\n")
+        lines.append("본문은 없음. 경로만.\n\n")
+        for path, meta in sens_items[:12]:
+            sec = str(meta.get("security_level") or "").upper()
+            lines.append(
+                f"- `{os.path.basename(path)}` — {format_security_level(sec, cfg)} — `{path}`\n"
+            )
+        lines.append("\n")
     if banner:
         lines.append(f"> **경고:** {banner}\n\n")
 

@@ -73,11 +73,18 @@ model:
 #   min_battery_percent: 30
 #   require_charging: false
 #
-# thread_settings:
-#   enabled: true
-#   include_conversations: true
-#   min_rel_depth: 1          # folders directly under a watch root only
-#   rename_window_hours: 24
+# dashboard_settings:
+#   enabled: true          # tray starts 127.0.0.1 operator page (not opened until menu)
+#   port: 8766             # not the MCP port
+#
+# compose_settings:
+#   max_sources: 8
+#   max_chars_per_source: 4000
+#   allow_p1_body: false
+#   formats_enabled: [md, html, docx]
+#
+# paths:
+#   composed_dir: "%USERPROFILE%/.docudog/composed"
 #
 #   enabled: true
 #   rules:

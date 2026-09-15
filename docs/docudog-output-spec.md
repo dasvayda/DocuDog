@@ -12,7 +12,8 @@ DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../
 | 파일 | `paths.*` / 기본 | 역할 | 갱신 |
 |------|------------------|------|------|
 | `DocuDog_state.json` | `state_path` | 기계 진실 소스 (파일별 해시·태그·등급·요약) | 분류·hash 스킵 시 |
-| `DocuDog_status.md` (+ `.html`) | `status_path` (빈 값이면 report 옆) | **현황 대시보드** (짧게) | 분류/스킵/시작 시 |
+| `DocuDog_status.md` (+ `.html`) | `status_path` (빈 값이면 report 옆) | **현황 스냅샷** (건강 머리글) | 분류/스킵/시작 시 |
+| `composed/*.md` (+ `.html`, 선택 `.docx`) | `composed_dir` (기본 artifact_home/composed) | 사용자가 고른 문서로 만든 요약·인수인계 | 만들기 요청 시 |
 | `classification_report.md` (+ `.html`) | `report_path` | 분류 이벤트 표 + 스킵 노트 | append |
 | `DocuDog_activity_log.md` | `activity_log_path` | 운영 타임라인 `[classify]` 등 | append |
 | `DocuDog_audit_log.md` | `audit_log_path` | **P1/P2만** 감사 + handling hint | append |
@@ -21,7 +22,7 @@ DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../
 | `DocuDog_last_classify.json` | `last_classify_path` | 최근 1건 분류(공유 직후 companion) | 분류 성공 시 |
 | `DocuDog_tag_overrides.json` | `tag_overrides_path` | 소유자 태그/등급 덮어쓰기 | 수동/도구 |
 
-권장 사용자 진입점: **DocuDog MCP** (Cursor/Claude). `DocuDog_status.md`는 `.docudog/` 안 옵션 산출물.
+권장 사용자 진입점: **DocuDog MCP** (Cursor/Claude). 사람용 현황은 트레이 **Open status page** (`127.0.0.1`). `DocuDog_status.md`는 스냅샷.
 
 ---
 
@@ -51,7 +52,7 @@ DocuDog **소스/설정 개발** 가이드는 저장소 루트 [`AGENTS.md`](../
 ## `DocuDog_activity_log.md`
 
 한 줄: `[로컬시각] [prefix] message`  
-주요 prefix: `classify`, `skip_hash`, `skip_filter`, `skip_extract`, `skip_empty`, `defer_active`, `defer_yield`, `defer_power`, `cadence_miss`, `audit`, `status`  
+주요 prefix: `classify`, `skip_hash`, `skip_filter`, `skip_extract`, `skip_empty`, `defer_active`, `defer_yield`, `defer_power`, `cadence_miss`, `audit`, `status`, `compose`  
 (`lineage`는 `activity_settings.log_lineage: true`일 때만)
 
 ---
@@ -65,7 +66,13 @@ P1/P2만. Handling hint 셀 예: `… [sharing: internal_only|redact_before_exte
 ## `DocuDog_status.md`
 
 오늘 분류 수, **지금 할 일(다이제스트)**, 주기 문서 cadence, **최근 대화(스레드)**, P1/P2, 미분류 스킵·민감 키워드, 등급별 backend 분포, 상세 파일 경로 링크.  
-HTML은 `<details>`로 스레드를 접음. MD는 짧은 트리(접기 없음).
+HTML은 `<details>`로 스레드를 접음. MD는 짧은 트리(접기 없음). 맨 위 **건강** 3줄. 민감은 제목·경로만.
+
+사람용 지금 화면은 트레이 Open status page (`http://127.0.0.1:8766/`, `dashboard_settings.port`).
+
+## `composed/` (제3 문서)
+
+사용자가 고른 분류 문서로 만든 요약(`brief`) 또는 인수인계(`handover`). 기본 `%USERPROFILE%/.docudog/composed/`. 워치 루트가 아님. MD + 동반 HTML, 선택 얇은 DOCX. P1/P2 본문 기본 생략.
 
 ## `DocuDog_mobile_digest.html` / `.json`
 

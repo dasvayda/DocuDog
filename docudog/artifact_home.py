@@ -12,6 +12,24 @@ from .paths_util import normalize_fs_path
 logger = logging.getLogger(__name__)
 
 
+def path_is_under(path: str, root: str) -> bool:
+    """True if ``path`` is ``root`` or a file/dir inside it (UNC-safe normcase)."""
+    if not path or not root:
+        return False
+    try:
+        p = normalize_fs_path(os.path.abspath(os.path.expandvars(path)))
+        r = normalize_fs_path(os.path.abspath(os.path.expandvars(root)))
+    except (OSError, ValueError):
+        return False
+    pc, rc = os.path.normcase(p), os.path.normcase(r)
+    return pc == rc or pc.startswith(rc + os.sep)
+
+
+def path_is_artifact(cfg: dict[str, Any] | None, path: str) -> bool:
+    """Skip classifying files DocuDog wrote under artifact home (composed, reports)."""
+    return path_is_under(path, artifact_home(cfg))
+
+
 def artifact_home(cfg: dict[str, Any] | None = None) -> str:
     raw = ""
     if isinstance(cfg, dict):

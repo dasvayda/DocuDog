@@ -12,7 +12,7 @@
 
 - 폴더 규칙을 강요하지 않음. 원본은 작업하던 자리에 그대로 둠.
 - 클라우드에 문서를 올리지 않음. 분류는 **이 PC(또는 지정한 로컬 모델 서버)** 에서 함.
-- 웹앱이 아님. 일상 입구는 **Cursor/Claude MCP**(또는 트레이). status.md는 `.docudog/` 안 옵션 산출물이며 강제 오픈하지 않음.
+- 웹앱이 아님. 일상 입구는 **Cursor/Claude MCP**(또는 트레이). 현황은 트레이 **Open status page** (`127.0.0.1`만). status.md는 `.docudog/` 안 스냅샷.
 
 오늘 구현의 범위는 Stage 1 **Watcher**: 지정 폴더를 감시하고, 한가할 때 읽고, 태깅·등급·요약을 붙인 뒤 로컬에 쌓음.
 
@@ -22,12 +22,19 @@
 
 1. 평소처럼 Word/PPT/HWP를 저장함.
 2. PC가 잠깐 비면 DocuDog이 새·바뀐 파일을 분류함.
-3. **먼저 묻는 곳:** Cursor/Claude에서 DocuDog MCP (`docudog_search` / 선택형 `docudog_semantic_search` / `docudog_get_lineage`).
-   기계 산출물은 `%USERPROFILE%/.docudog/` (status.md는 그 안, 열 필요 없음).
+3. **먼저 묻는 곳:** Cursor/Claude에서 DocuDog MCP. 사람만 볼 때는 트레이 **Open status page**.
+   기계 산출물은 `%USERPROFILE%/.docudog/` (보고서·인수인계는 `composed/`).
 4. P1이면 트레이 토스트가 짧게 뜨고, audit 로그에 남음.
 5. Cursor/Claude에서는 MCP로 “이 과제 최신 덱”처럼 **이미 분류된 코퍼스**를 질의함.
 
 원본을 옮기거나 이름을 강제 변경하지 않음.
+
+### 보고서·인수인계 만들기
+
+1. 트레이 **Open status page**.
+2. 이미 분류된 파일에 체크(또는 스레드 선택).
+3. 요약·보고서 또는 인수인계를 고르고 요청 문장을 적음.
+4. **만들기** → `%USERPROFILE%/.docudog/composed/`. 원본은 안 옮김. P1/P2는 제목·경로만.
 
 ---
 
@@ -44,7 +51,7 @@
 | 같은 내용 스킵 | 파일이 안 바뀌었으면(SHA-256 동일) LLM을 다시 안 돌림. |
 | 공유 폴더 | UNC/NAS 경로 감시, 잠긴 파일은 재시도. state/리포트는 **한 세트**가 원칙. |
 | 한 건만 돌리기 | `python main.py --file 경로` — 워처 없이 그 파일만 분류. |
-| 트레이 (선택) | `python main.py --tray`. MCP 설정 쓰기, `.docudog` 열기, 일시정지. status.md는 안 염. `--install-startup`으로 시작프로그램 바로가기. |
+| 트레이 (선택) | `python main.py --tray`. **Open status page**(이 PC만, 메뉴로만). MCP 설정 쓰기, 데이터 폴더·`composed` 폴더 열기, 일시정지. `--install-startup`으로 시작프로그램 바로가기. |
 
 **아직 아님:** 메일 첨부·USB를 OS 커널에서 가로채기. 파일이 계속 커지는 중의 size-settle은 일부만(Downloads min-age + `.crdownload` 스킵).
 
@@ -109,7 +116,8 @@
 
 | 여는 파일 | 역할 |
 |-----------|------|
-| **`DocuDog_status.md` / `.html`** | **기본 진입점.** 오늘 건수, 할 일, 최근 대화, 경고. |
+| **`DocuDog_status.md` / `.html`** | 스냅샷 현황. 트레이 **Open status page**가 지금 화면(만들기·일시정지). |
+| `composed/` | 고른 문서로 만든 요약·인수인계 (MD + HTML, 선택 Word). 원본은 그대로. |
 | `DocuDog_mobile_digest.html` | 폰에서 볼 짧은 요약 (같은 숫자의 축소판). |
 | `classification_report.md` | 분류 **이벤트 로그** (한 줄씩 append). |
 | `DocuDog_activity_log.md` | 오늘 워처가 뭘 했는지 (`classify` / `skip_*` / `defer_*`). |
@@ -169,6 +177,8 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 사용자 점검 때 기대치를 맞추기 위함.
 
 - 파일 탐색기/웹 드라이브 **대체** 또는 폴더 자동 이동
+- 인터넷에 열리는 대시보드, 문서 도서관(그래프·태그 편집)
+- 켤 때마다 브라우저 강제 오픈
 - 스캔 PDF OCR, MCP SSE 서버
 - 메일·메신저로 나가는 파일 **차단**
 - 클라우드 동기화, 다중 사용자 실시간 협업

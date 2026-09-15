@@ -43,7 +43,7 @@ def append_activity(
     """
     Append one activity line: ``[prefix] message``.
     Prefixes: classify | skip_hash | skip_filter | skip_extract | skip_empty |
-    defer_active | defer_yield | audit | lineage | status.
+    defer_active | defer_yield | audit | lineage | status | compose.
     """
     if not activity_enabled(cfg):
         return
@@ -56,7 +56,7 @@ def append_activity(
         "# DocuDog activity log\n\n"
         "운영 타임라인 (append-only). P1/P2 감사는 `DocuDog_audit_log.md`를 사용.\n"
         "접두사: `[classify]` `[skip_hash]` `[skip_filter]` `[skip_extract]` "
-        "`[skip_empty]` `[audit]` `[lineage]` 등.\n\n"
+        "`[skip_empty]` `[audit]` `[lineage]` `[compose]` 등.\n\n"
     )
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

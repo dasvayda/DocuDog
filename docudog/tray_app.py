@@ -68,7 +68,7 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         logger.warning("Tray needs pystray and pillow: pip install pystray pillow")
         return
 
-    from . import artifact_home, runtime_pause, watch_presets
+    from . import artifact_home, operator_http, runtime_pause, watch_presets
 
     remote_process: dict[str, Any] = {"proc": None}
 
@@ -97,6 +97,16 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
 
     def on_open(_icon: Any, _item: Any) -> None:
         _open_dir(artifact_home.artifact_home(cfg))
+
+    def on_status(_icon: Any, _item: Any) -> None:
+        from . import operator_http
+
+        operator_http.open_operator_page(cfg, config_dir=config_dir)
+
+    def on_open_composed(_icon: Any, _item: Any) -> None:
+        from . import compose as compose_mod
+
+        _open_dir(compose_mod.composed_dir(cfg))
 
     def on_pause(_icon: Any, item: Any) -> None:
         runtime_pause.set_paused(not runtime_pause.is_paused())
@@ -167,7 +177,11 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         icon.stop()
         os._exit(0)
 
+    operator_http.start_operator_http(cfg, config_dir=config_dir)
+
     menu = pystray.Menu(
+        pystray.MenuItem("Open status page", on_status),
+        pystray.MenuItem("Open composed folder", on_open_composed),
         pystray.MenuItem("Write MCP configs", on_mcp),
         pystray.MenuItem(
             "Watch folders",
@@ -211,4 +225,4 @@ def attach_tray(cfg: dict[str, Any], *, config_dir: str) -> None:
         icon.run_detached()
     else:
         threading.Thread(target=icon.run, daemon=True).start()
-    logger.info("Tray attached (no status.md auto-open)")
+    logger.info("Tray attached (status page opens only from the menu)")

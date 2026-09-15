@@ -5,7 +5,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 ## Product snapshot
 
 - **Goal**: Background file watching + idle-aware scheduling, local document text extraction, **on-device LLM** classification (tags, P1–P4 security level, summary), append-only Markdown report and optional lineage output.
-- **MVP scope**: Watcher pipeline; optional tray launcher. No document-browser GUI, no server sync in code paths that ship today.
+- **MVP scope**: Watcher pipeline; optional tray launcher and **loopback operator page** (status + compose). No document-library GUI, no server sync in code paths that ship today.
 - **User-facing feature map:** [Features.md](Features.md) (what to open, what you get). Module inventory: [docs/implemented-features.md](docs/implemented-features.md).
 
 ## Repository map (Python)
@@ -18,7 +18,8 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | HWP | `docudog/extract_hwp.py` | `.hwp`/`.hwpx` text via **`syhwp`**; `reference/hop` is the desktop/rhwp format reference only |
 | PDF | `docudog/extract_pdf.py` | Text layer via **`pypdf`**; encrypted/empty (scan) skip |
 | Artifacts | `docudog/artifact_home.py` | Default `%USERPROFILE%/.docudog/`; copy-only migrate from `Documents/DocuDog/` |
-| Tray | `docudog/tray_app.py`, `notify.py` | Optional `--tray` / `--install-startup`; P1 toast |
+| Tray | `docudog/tray_app.py`, `notify.py` | Optional `--tray` / `--install-startup`; P1 toast; **Open status page** |
+| Compose | `docudog/compose.py`, `operator_http.py` | Local 127.0.0.1 page: pick classified files → MD/HTML/thin DOCX in `composed/` |
 | LLM | `docudog/inference.py` | LiteRT-LM, LM Studio/OpenAI-compatible HTTP (`/v1/chat/completions`), mock |
 | LiteRT env | `docudog/env_litert.py` | Native log suppression, `apply_litert_env_defaults()` |
 | Report | `docudog/reporter.py` | Append rows to `classification_report.md` and sync sibling `classification_report.html` |
@@ -33,7 +34,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Freshness | `docudog/freshness.py` | `is_latest` / `superseded_by` / `stale_classification` on MCP rows (`freshness_settings`); `docudog_resolve` |
 | Semantic search | `docudog/semantic_index.py` | Optional Zvec index (`semantic_search.enabled`); off by default |
 | Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
-| Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); lineage stays archive |
+| Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); health header; lineage stays archive |
 | Output spec (readers) | [docs/docudog-output-spec.md](docs/docudog-output-spec.md) | How agents/scripts consume local artifacts (not this repo's `AGENTS.md`) |
 | RAM / Cursor checklist | [docs/memory-checklist.md](docs/memory-checklist.md) | Other-PC diagnosis: Zvec, MCP, LiteRT, Agent list vs open workspace |
 | Config | `docudog/config_loader.py`, `main.load_config()`, `config.json` | Defaults + YAML overlay (`config.yml` / `config.yaml`): watch roots, filters, paths, `model.*`, `audit_settings`, `lineage_settings` |

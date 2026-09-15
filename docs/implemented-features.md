@@ -31,6 +31,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-09-12 | Cursor/DocuDog RAM 점검 목록 (`docs/memory-checklist.md`) — 기기별 config·MCP·Zvec |
 | 2026-09-07 | 선택형 인증 Streamable HTTP MCP 게이트웨이: 로컬 stdio 유지, Bearer 인증·Host/Origin 보호·비루프백 명시 승인 |
 | 2026-09-10 | 감시 폴더 프리셋(Desktop/Downloads/Documents) + 문서만 통과하는 junk 필터·Downloads min-age settle |
+| 2026-09-15 | 트레이 Open status page + loopback 현황(`operator_http`) + compose(요약·인수인계 → `composed/`) |
 | 2026-09-17 | 코파일럿용 최신본 해석(`is_latest`/`superseded_by`/`docudog_resolve`) + 공유 폴더 낡은 분류 플래그(`stale_classification`) |
 
 ---
@@ -58,7 +59,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 주기 문서 cadence | `cadence_settings.rules` — 주/월 부재 감지 → status·digest·`[cadence_miss]` | `docudog/cadence.py` |
 | 단일 파일·1회 종료 | `main.py --file`, `--once`, `DOCUDOG_RUN_ONCE=1`; `tools/classify_one.py` | `docudog/single_file.py`, `main.py` |
 | 산출물 홈 | 기본 `%USERPROFILE%/.docudog/`; 예전 `Documents/DocuDog/` 복사 마이그레이션(삭제 없음) | `docudog/artifact_home.py` |
-| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴에서 MCP 쓰기·**Watch folders** 프리셋·데이터 폴더·인증 원격 MCP 게이트웨이 시작/종료. status.md 강제 오픈 없음 | `docudog/tray_app.py` |
+| 트레이·부팅 | `--tray`, `--install-startup`; 메뉴 **Open status page**(loopback, 자동 오픈 없음)·composed 폴더·MCP 쓰기·Watch folders·데이터 폴더·원격 MCP·일시정지 | `docudog/tray_app.py`, `docudog/operator_http.py` |
 | P1 토스트 | 신규 P1 분류 시 Windows 토스트 (`notify_settings.enabled`) | `docudog/notify.py` |
 
 ---
@@ -116,7 +117,8 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `classification_report.md` | 분류 행 append; Inference 열(구 리포트 호환); 말미 `_Last inference: ..._` 메타(HTML 주석 블록으로 치환) | `docudog/reporter.py` |
 | `classification_report.html` | MD와 **동일 basename**; 분류/노트 append 및 시작 시 MD에서 동기화(브라우저 열람용) | `docudog/reporter.sync_report_html` |
 | `DocuDog_activity_log.md` | 운영 타임라인 append (`[classify]`/`[skip_*]`/`[audit]` 등) | `docudog/activity.py` |
-| `DocuDog_status.md` (+html) | 현황: 액션·cadence·**최근 대화**·오늘 분류·P1/P2·미분류 경고. HTML 스레드 `<details>` | `docudog/status_dashboard.py`, `threads.py` |
+| `DocuDog_status.md` (+html) | 현황 스냅샷: **건강** 머리글·민감 제목만·액션·cadence·최근 대화. HTML 스레드 `<details>` | `docudog/status_dashboard.py`, `threads.py` |
+| `composed/` | 선택 문서 → 요약·인수인계 MD(+HTML, 선택 얇은 DOCX). P1/P2 본문 기본 생략. artifact_home 아래라 재분류 안 함 | `docudog/compose.py` |
 | 규칙 힌트 하이브리드 | `rule_settings` 키워드/정규식 → 프롬프트 힌트 + 등급 floor (`rule_floor`) | `docudog/rule_hints.py`, `router` |
 | 유사·맥락 후보 | 분류 후 `related_paths` / `last_related` (lineage key·요약 Jaccard·context bundle) | `docudog/related_docs.py` |
 | `DocuDog_state.json` | 파일별 `file_id`·해시·메타; `threads[]`; `last_inference_*`; 선택 `context_bundles`; `ops` | `main.load_state` / `docudog/router` |
@@ -140,11 +142,13 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `lint_governance.py` | state/audit 경량 린트 → `DocuDog_lint_report.md` (원본 파일 미수정) |
 | `test_threads.py` | file_id rename + version/conversation 스레드 스모크 |
 | `test_pdf_extract.py` | 빈 PDF skip + 텍스트 레이어 추출 스모크 |
+| `compose_docs.py` | 분류된 file_id/경로로 제3 문서 생성 (테스트·자동화). 사람 손은 현황 페이지 |
 | `docudog_tray.py` | `main.py --tray` 래퍼 |
 | `test_mcp_contract.py` | MCP search pagination·오류 코드 계약 스모크 |
 | `test_freshness.py` | 최신본 그룹핑(`_v1`/`_최종_진짜`)·`latest_only`·`docudog_resolve`·`stale_classification` 스모크 |
 | `test_remote_mcp.py` | 원격 MCP 기본 비활성·토큰·바인딩·Bearer 게이트 스모크 |
 | `test_watch_presets.py` | Desktop/Downloads 프리셋 저장 + 문서만 통과·exe/jpg/`~$`/crdownload 스킵 + Downloads min-age |
+| `test_compose.py` | compose P1 본문 생략·handover 4절·artifact skip·operator Host 가드 |
 | `test_semantic_index.py` | 선택형 Zvec 인덱스의 증분 교체·P등급/MCP 게이트 오프라인 스모크 (test-only hashing embedding) |
 | `rebuild_semantic_index.py` | 이미 분류된 파일을 선택형 Zvec 인덱스에 재구축 |
 
@@ -155,7 +159,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 다음은 **현 코드에서 기대하면 안 되는 것**에 가깝습니다.
 
 - **보안 등급 P1–P4의 조직 정책 매핑** 또는 키워드·규칙 기반 자동 배정
-- **웹 UI** 또는 중앙 서버로의 자동 동기화(마스터 플랜의 서버 RAG·DLP **미구현**)
+- **공개 웹 UI** 또는 중앙 서버로의 자동 동기화. 로컬 `127.0.0.1` 현황 페이지는 있음(문서 도서관 아님)
 - **스캔 PDF OCR** 또는 암호 PDF 본문 (텍스트 레이어만 추출)
 - **무인 원격 MCP 공개** — `remote_mcp_settings.enabled`와 Bearer 토큰을 명시하지 않으면 HTTP listener가 시작되지 않음
 - **커널·이메일 후킹** 수준의 실시간 DLP 차단

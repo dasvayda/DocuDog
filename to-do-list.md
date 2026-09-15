@@ -65,6 +65,8 @@
   도구 호출만이 아니라 `DocuDog_status.md` / `last_classify`를 MCP **resource URI**로 노출; 또는 `docudog_context_pack(topic)`이 검색 Top-K 메타를 **짧은 마크다운 묶음**으로 반환. 질의 UX는 `260910-04`와 같이 구현함. `260818-03`의 cursor/offset·오류 계약 위에 구현함.  
   **구 ID:** #21b.
 
+> **2026-09-15 Compose·현황:** `260915-01`~`03` Done. 사용 순서 [`.cursor/plans/user-compose-dashboard-260915.md`](.cursor/plans/user-compose-dashboard-260915.md).
+
 **DocBank 검토 요약 (2026-08-18, 이식하지 않을 것)**  
 DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P등급·계보). **스킵:** CAS vault·가상 트리, HTTP 쓰기, 웹/TUI, pack/S3, Go 임베드. Shadow Git/검증 백업은 master-plan 타임머신 에픽에서 **참고만** (`260818-D`).
 
@@ -103,6 +105,9 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 
 - **260910-02. 코파일럿용 최신본 해석 (`_v1` / `_최종_진짜`)**: `docudog/freshness.py` 가 파일명 정규화 그룹에서 mtime·최종/초안 토큰·버전 번호로 최신 1건을 뽑아 `is_latest` / `superseded_by` / `latest_reason` 을 search·semantic_search·get 결과에 붙임. `docudog_search(latest_only=true)` 와 신규 `docudog_resolve(query)`(최신본 + 이전 버전 요약 1회 호출). 원본 파일명은 바꾸지 않음. — 2026-09-17
 - **260910-06. 공유 폴더 최신 시각을 MCP에 명시**: 같은 응답에 `file_mtime_utc` / `file_exists` / `stale_classification` / `stale_reason`. 디스크 mtime이 `last_analyzed_utc` 보다 `freshness_settings.stale_skew_seconds`(기본 60) 이상 최신이면 "재분류 대기 중" 한 줄. 다중 PC 동기화·원본 복사 없음. — 2026-09-17
+- **260915-03. 로컬 운영 대시보드**: 트레이 Open status page, 127.0.0.1 operator_http(만들기·일시정지), status 건강 머리글. 시작 시 브라우저 강제 없음. — 2026-09-15
+- **260915-01. 선택 문서 Compose**: compose.py가 분류된 소스로 MD/HTML/얇은 DOCX를 .docudog/composed/에 씀. P1 본문 생략, artifact 재분류 스킵. — 2026-09-15
+- **260915-02. 인수인계 템플릿**: 같은 엔진 kind=handover — 개요/읽는 순서/문서 목록/공백. — 2026-09-15
 - **260910-01. 바탕화면·다운로드·공유 폴더 프리셋 + 문서만 필터**: `folder_presets`(Desktop/Downloads/Documents, UNC는 `extra_directories`), 트레이 Watch folders, 설치파일·이미지·`~$`/`.crdownload` 스킵, Downloads `downloads_min_age_seconds`. 원본 이동 없음. — 2026-09-10
 - **260907-01. 로컬·클라우드 LLM 공용 MCP 게이트웨이**: 기존 stdio MCP를 유지하면서 선택형 Streamable HTTP(`/mcp`) 실행 경로를 추가함. 기본 비활성, 환경변수 Bearer 토큰, loopback 기본 바인딩, Host/Origin 보호, P등급·allowlist·발췌 정책 재사용. — 2026-09-07
 - **260903-01. 선택형 로컬 하이브리드 의미검색 (Zvec)** (`semantic_search.enabled`, 기본 false): Zvec FTS+벡터 RRF 문단 인덱스, SHA 증분 교체·총 청크 상한, P1/P2 미색인, allowlist/발췌 정책 MCP 게이트, `docudog_semantic_search`, 기존 코퍼스 재빌드·오프라인 smoke를 추가함. 선택 의존성은 `requirements-semantic.txt`. — 2026-09-07
