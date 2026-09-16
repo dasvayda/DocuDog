@@ -130,7 +130,8 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 | 도구 | 쓰는 순간 |
 |------|-----------|
 | `docudog_status` | 오늘 뭐가 돌았나, 최근 대화 요약. |
-| `docudog_search` | 태그·P등급·요약으로 찾기. `since`/`until`(UTC 날짜) 가능. |
+| `docudog_search` | 태그·P등급·요약으로 찾기. `since`/`until`(UTC 날짜) 가능. `latest_only: true`면 최신본만. |
+| `docudog_resolve` | "견적서 최신" 한 방. 최신본 + 대체된 이전 버전 요약 + 최신 판정 이유. |
 | `docudog_semantic_search` | **선택 기능**. P3/P4로 색인된 본문을 의미·전문 검색으로 찾아 경로·문단 위치·짧은 근거를 반환. 현재 allowlist와 P등급 발췌 정책을 통과한 결과만 보임. |
 | `docudog_get` | 한 파일 메타. 경로 또는 `file_id`. 본문 발췌는 기본 P4만. P1/P2는 `excerpt_blocked_p1`. |
 | `docudog_get_lineage` | 그 과제 **최신 경로** + 멤버 타임라인 + 한 줄 변경. |
@@ -141,6 +142,8 @@ HTML은 해당 MD와 **같은 이름**. 브라우저로 status를 열면 스레�
 | `docudog_last_classify` / `recent_changes` | 방금 분류, 최근 내용 변화. |
 
 **검색·페이지:** `docudog_search` / `thread` / `related`는 `limit`·`offset`·`cursor`로 페이지 매김, 안정적 `code` 오류. 본문 발췌는 기본 P4만 — P1/P2는 `excerpt_blocked_p1`.
+
+**최신본·낡은 분류 (`freshness_settings`):** 검색 결과 한 줄마다 `is_latest` / `superseded_by` / `latest_reason` 이 붙어, `_초안`과 `_최종_진짜`가 같이 나와도 AI가 최신본을 인용함. 공유 폴더에서 분류 후 파일이 덮어써졌으면 `file_mtime_utc` > `last_analyzed_utc` 로 보고 `stale_classification: true` + "재분류 대기 중" 한 줄. 파일명을 바꾸거나 PC 간 동기화를 하지는 않음.
 
 **1클릭 연결:** `python tools/docudog_mcp.py --write-all-mcp` (Cursor + Claude Desktop 동시). `--print-install`로 JSON만 확인. 안내 [docs/mcp-connect.md](docs/mcp-connect.md). 읽기 전용. P1/P2 원문을 MCP로 열어 두지 않음.
 

@@ -31,6 +31,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 2026-09-12 | Cursor/DocuDog RAM 점검 목록 (`docs/memory-checklist.md`) — 기기별 config·MCP·Zvec |
 | 2026-09-07 | 선택형 인증 Streamable HTTP MCP 게이트웨이: 로컬 stdio 유지, Bearer 인증·Host/Origin 보호·비루프백 명시 승인 |
 | 2026-09-10 | 감시 폴더 프리셋(Desktop/Downloads/Documents) + 문서만 통과하는 junk 필터·Downloads min-age settle |
+| 2026-09-17 | 코파일럿용 최신본 해석(`is_latest`/`superseded_by`/`docudog_resolve`) + 공유 폴더 낡은 분류 플래그(`stale_classification`) |
 
 ---
 
@@ -104,6 +105,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | 선택형 본문 의미 검색 | `semantic_search.enabled=true`일 때만 Zvec FTS+벡터(RRF) 인덱스 생성; 추출 텍스트를 문단 chunk로 색인하고 SHA 변경 시 교체. P1/P2는 기본 미색인, MCP 결과는 allowlist + 발췌 정책을 다시 적용 | `docudog/semantic_index.py`, `docudog/router.py`, `docudog/mcp_service.py` |
 | UNC/NAS | 경로 정규화, 이벤트 디듑, 파일 열기 재시도 | `docudog/paths_util.py`, `docudog/watcher.py` |
 | MCP 서버 | 읽기 전용; lineage/bundle/search 날짜·cursor/offset; 선택형 `docudog_semantic_search`; 안정적 오류 `code`; `--write-all-mcp`; P1 excerpt `excerpt_blocked_p1`; 선택형 `--remote` Streamable HTTP 게이트웨이 | `tools/docudog_mcp.py`, `docudog/mcp_service.py`, `docudog/remote_mcp.py` |
+| 최신본·낡은 분류 | `_v1`/`_최종_진짜` 정규화 그룹에서 mtime·파일명 토큰·버전 번호로 최신 1건 판정 → 검색·get·semantic 결과에 `is_latest`/`superseded_by`/`latest_reason`; `file_mtime_utc` > `last_analyzed_utc` 면 `stale_classification`; `docudog_resolve(query)`가 최신본 + 이전 버전 요약을 1회 호출로 반환 (`freshness_settings`, 기본 on; 파일명 변경·PC 동기화 없음) | `docudog/freshness.py`, `docudog/mcp_service.py`, `tools/docudog_mcp.py` |
 
 ---
 
@@ -140,6 +142,7 @@ DocuDog **현재 코드베이스에 존재하는 동작**을 사람·AI 리뷰�
 | `test_pdf_extract.py` | 빈 PDF skip + 텍스트 레이어 추출 스모크 |
 | `docudog_tray.py` | `main.py --tray` 래퍼 |
 | `test_mcp_contract.py` | MCP search pagination·오류 코드 계약 스모크 |
+| `test_freshness.py` | 최신본 그룹핑(`_v1`/`_최종_진짜`)·`latest_only`·`docudog_resolve`·`stale_classification` 스모크 |
 | `test_remote_mcp.py` | 원격 MCP 기본 비활성·토큰·바인딩·Bearer 게이트 스모크 |
 | `test_watch_presets.py` | Desktop/Downloads 프리셋 저장 + 문서만 통과·exe/jpg/`~$`/crdownload 스킵 + Downloads min-age |
 | `test_semantic_index.py` | 선택형 Zvec 인덱스의 증분 교체·P등급/MCP 게이트 오프라인 스모크 (test-only hashing embedding) |

@@ -30,6 +30,7 @@ Concise guidance for AI coding agents working on **DocuDog** (see product intent
 | Semantic log | `docudog/semantic_diff.py` | Same-path hash history + lineage peer one-liner |
 | Paths/UNC | `docudog/paths_util.py` | UNC-safe normalize, file open retries |
 | MCP | `tools/docudog_mcp.py`, `docudog/mcp_service.py`, `docudog/remote_mcp.py` | Read-only corpus tools; stdio plus opt-in `--remote` HTTP; [docs/mcp-connect.md](docs/mcp-connect.md) |
+| Freshness | `docudog/freshness.py` | `is_latest` / `superseded_by` / `stale_classification` on MCP rows (`freshness_settings`); `docudog_resolve` |
 | Semantic search | `docudog/semantic_index.py` | Optional Zvec index (`semantic_search.enabled`); off by default |
 | Activity | `docudog/activity.py` | Append-only `DocuDog_activity_log.md` |
 | Status | `docudog/status_dashboard.py` | Short `DocuDog_status.md` (+html); lineage stays archive |

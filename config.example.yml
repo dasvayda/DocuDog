@@ -105,6 +105,12 @@ model:
 #   embedding_model: intfloat/multilingual-e5-small
 #   embedding_device: cpu
 
+# Latest-version / stale-classification signals in MCP answers (on by default).
+# Set enabled: false to return raw state rows without mtime comparison.
+# freshness_settings:
+#   enabled: true
+#   stale_skew_seconds: 60  # ignore clock/filesystem skew below this
+
 # Optional remote MCP gateway for Claude Cowork / ChatGPT connectors.
 # Keep disabled unless a trusted tunnel or TLS reverse proxy is configured.
 # The bearer token is read only from DOCUDOG_REMOTE_MCP_TOKEN (never commit it).

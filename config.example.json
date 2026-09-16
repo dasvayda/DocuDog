@@ -79,6 +79,10 @@
     "max_security_level_for_excerpt": "P4",
     "max_excerpt_chars": 1200
   },
+  "freshness_settings": {
+    "enabled": true,
+    "stale_skew_seconds": 60
+  },
   "remote_mcp_settings": {
     "enabled": false,
     "host": "127.0.0.1",

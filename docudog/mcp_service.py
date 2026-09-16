@@ -8,7 +8,7 @@ import re
 from base64 import b64decode, b64encode
 from typing import Any
 
-from . import mobile_digest, semantic_diff, status_dashboard
+from . import freshness, mobile_digest, semantic_diff, status_dashboard
 from .config_loader import load_app_config
 from . import artifact_home
 from . import semantic_index
@@ -76,6 +76,8 @@ class McpService:
         self.cfg = load_app_config(self.root)
         self._state: dict[str, Any] | None = None
         self._state_mtime: float | None = None
+        self._latest_map: dict[str, dict[str, Any]] | None = None
+        self._latest_map_mtime: float | None = None
 
     def mcp_settings(self) -> dict[str, Any]:
         raw = self.cfg.get("mcp_settings")
@@ -163,12 +165,31 @@ class McpService:
             security_level
         ) >= 0
 
-    def _file_row(self, path: str, meta: dict[str, Any]) -> dict[str, Any]:
+    def latest_map(self, state: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+        """Cache the latest/superseded verdict for the current state snapshot."""
+        if not freshness.enabled(self.cfg):
+            return {}
+        state = state if isinstance(state, dict) else self.load_state()
+        if (
+            self._latest_map is not None
+            and self._latest_map_mtime == self._state_mtime
+        ):
+            return self._latest_map
+        self._latest_map = freshness.build_latest_map(state, self.cfg)
+        self._latest_map_mtime = self._state_mtime
+        return self._latest_map
+
+    def _file_row(
+        self,
+        path: str,
+        meta: dict[str, Any],
+        latest_map: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         tags = meta.get("tags") or []
         if isinstance(tags, str):
             tags = [tags]
         sec = str(meta.get("security_level") or "")
-        return {
+        row = {
             "path": path,
             "file_id": str(meta.get("file_id") or ""),
             "basename": os.path.basename(path),
@@ -183,6 +204,9 @@ class McpService:
             "inference_source": str(meta.get("inference_source") or ""),
             "sha256_prefix": str(meta.get("sha256") or "")[:16],
         }
+        row.update(freshness.staleness(path, meta, self.cfg))
+        row.update(freshness.latest_info(path, latest_map))
+        return row
 
     def status(self) -> dict[str, Any]:
         state = self.load_state()
@@ -218,11 +242,13 @@ class McpService:
         until: str = "",
         offset: int = 0,
         cursor: str = "",
+        latest_only: bool = False,
     ) -> dict[str, Any]:
         lim, off, page_error = _page_args(limit, offset, cursor)
         if page_error is not None:
             return page_error
         state = self.load_state()
+        lmap = self.latest_map(state)
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
         level_u = level.strip().upper()
         tag_q = tag.strip().casefold()
@@ -266,7 +292,10 @@ class McpService:
                         continue
                 elif q.casefold() not in blob.casefold():
                     continue
-            hits.append(self._file_row(path, meta))
+            row = self._file_row(path, meta, lmap)
+            if latest_only and row.get("is_latest") is False:
+                continue
+            hits.append(row)
         hits.sort(key=lambda r: r.get("last_analyzed_utc") or "", reverse=True)
         page = hits[off : off + lim]
         next_offset = off + len(page)
@@ -277,6 +306,7 @@ class McpService:
             "offset": off,
             "limit": lim,
             "showing": len(page),
+            "latest_only": bool(latest_only),
             "has_more": has_more,
             "next_cursor": _next_cursor(next_offset) if has_more else None,
             "results": page,
@@ -309,6 +339,9 @@ class McpService:
             message = str(exc)
             code = "semantic_search_disabled" if "disabled" in message else "semantic_search_unavailable"
             return _error(code, message)
+        state = self.load_state()
+        lmap = self.latest_map(state)
+        files = state.get("files") if isinstance(state.get("files"), dict) else {}
         safe_rows: list[dict[str, Any]] = []
         for row in payload.get("results") or []:
             if not isinstance(row, dict):
@@ -319,6 +352,11 @@ class McpService:
             # policy rejects it, even if it was indexed under an older policy.
             if not self.path_allowed(path) or not self.excerpt_allowed(level_value):
                 continue
+            meta = files.get(path)
+            row.update(
+                freshness.staleness(path, meta if isinstance(meta, dict) else {}, self.cfg)
+            )
+            row.update(freshness.latest_info(path, lmap))
             safe_rows.append(row)
         payload["results"] = safe_rows
         payload["match_count"] = len(safe_rows)
@@ -359,7 +397,7 @@ class McpService:
                 path=path,
                 file_id=fid,
             )
-        row = self._file_row(norm, meta)
+        row = self._file_row(norm, meta, self.latest_map(state))
         row["ok"] = True
         row["summary_history"] = list(meta.get("summary_history") or [])[-5:]
         row["in_allowlist"] = self.path_allowed(norm)
@@ -410,6 +448,46 @@ class McpService:
                         row["code"] = "excerpt_error"
         return row
 
+    def resolve(self, query: str = "", *, limit: int = 3) -> dict[str, Any]:
+        """One call for "견적서 최신": latest copies only, with the versions they replace.
+
+        Keeps a chat client from quoting `_초안` when `_최종` exists, without
+        forcing the agent to chain search -> get -> get_lineage itself.
+        """
+        try:
+            top = int(limit)
+        except (TypeError, ValueError):
+            return _error("invalid_limit", "limit must be an integer")
+        if top < 1 or top > 20:
+            return _error("invalid_limit", "limit must be between 1 and 20")
+        found = self.search(query=query, limit=_MAX_PAGE_SIZE, latest_only=True)
+        if not found.get("ok"):
+            return found
+        state = self.load_state()
+        lmap = self.latest_map(state)
+        rows = list(found.get("results") or [])
+        rows.sort(
+            key=lambda r: freshness.effective_utc(
+                str(r.get("path") or ""),
+                {"last_analyzed_utc": r.get("last_analyzed_utc")},
+            ),
+            reverse=True,
+        )
+        results: list[dict[str, Any]] = []
+        for row in rows[:top]:
+            path = str(row.get("path") or "")
+            out = dict(row)
+            out["previous_versions"] = freshness.previous_versions(state, path, lmap)
+            out["superseded_count"] = len(out["previous_versions"])
+            results.append(out)
+        return {
+            "ok": True,
+            "query": query,
+            "candidate_count": found.get("match_count", 0),
+            "showing": len(results),
+            "results": results,
+        }
+
     def by_hash(self, sha256: str, *, limit: int = 20) -> dict[str, Any]:
         needle = str(sha256 or "").strip().lower()
         if len(needle) < 8:
@@ -420,6 +498,7 @@ class McpService:
         if page_error is not None:
             return page_error
         state = self.load_state()
+        lmap = self.latest_map(state)
         files = state.get("files") if isinstance(state.get("files"), dict) else {}
         hits: list[dict[str, Any]] = []
         for path, meta in files.items():
@@ -432,7 +511,7 @@ class McpService:
                 path
             ):
                 continue
-            hits.append(self._file_row(path, meta))
+            hits.append(self._file_row(path, meta, lmap))
         return {"ok": True, "match_count": len(hits), "results": hits[:lim]}
 
     def thread(
@@ -618,6 +697,10 @@ class McpService:
             "semantic_search": {
                 "enabled": semantic_index.enabled(self.cfg),
                 "index_path": semantic_index.index_path(self.cfg),
+            },
+            "freshness": {
+                "enabled": freshness.enabled(self.cfg),
+                "stale_skew_seconds": freshness.stale_skew_seconds(self.cfg),
             },
             "remote_mcp": {
                 "enabled": remote.get("enabled") is True,

@@ -35,6 +35,8 @@
 
 > **2026-09-10 구현:** `260910-01` Done. Desktop/Downloads/Documents 프리셋, 문서만 분류, Downloads min-age.
 
+> **2026-09-17 구현:** `260910-02` 최신본 해석(`is_latest` / `superseded_by` / `docudog_resolve`) · `260910-06` 낡은 분류 플래그(`stale_classification`). 남은 초보 연동·컨텍스트 팩은 `260910-03` / `04` / `05` / `260805-02`.
+
 > **모바일 기기 계획(구현 보류):** [docs/mobile-device-plan.md](docs/mobile-device-plan.md). PC Watcher를 모바일에 그대로 이식하지 않고, 네이티브 수동 수집·경량 OCR/로컬 LLM·사용자 승인 기반 PC 동반 처리를 후속 단계로 검토한다.
 
 - **260818-04. watch settle / min-age (다운로드·Office 잠금)**  
@@ -42,10 +44,6 @@
   **출처:** DocBank watched inbox — 크기+mtime 안정 + 선택 최소 파일 나이. 원본은 복사하지 않음.  
   **갭:** 지금은 idle + `file_open_retries` + Downloads min-age. `*.crdownload`는 확장자 스킵. 이어 쓰는 JSONL 등 허용 확장자가 계속 커지는 경우는 약함.  
   **방향:** `watch_settings`에 확장자별 settle 초·연속 size 샘플. 분류는 안정된 뒤에만.
-
-- **260910-02. 코파일럿용 최신본 해석 (`_v1` / `_최종_진짜`)**  
-  **갭:** lineage·thread에 `latest_path`는 있으나, 검색 결과가 `_초안`과 `_최종`을 나란히 주면 모델이 아무거나 인용함.  
-  **방향:** MCP `docudog_search` / `docudog_semantic_search`에 `is_latest`·`superseded_by`·한 줄 이유(mtime, thread, 파일명 토큰). 질의 “견적서 최신”용 `docudog_resolve`(또는 get_lineage 확장) 1회 호출로 최신 1건 + 이전 버전 요약을 반환. 파일명 강제 변경 없음.
 
 - **260910-03. 초보 연동 도우미 (Cursor / Claude Desktop / Cowork / ChatGPT)**  
   **갭:** 로컬 stdio는 `--write-all-mcp`가 있으나 토글·Python 경로에서 막힘. 원격 MCP는 `setx` + 터널 + YAML이라 Cowork/ChatGPT 초보가 못 따라감.  
@@ -58,10 +56,6 @@
 - **260910-05. 첫 실행 제로설정 (JSON 안 열기)**  
   **갭:** Organizer Fatigue 사용자는 `config.json`·watch 경로·모델 백엔드를 안 만짐. 설치 후 “돌아가는지”를 모름.  
   **방향:** `--tray` 첫 실행 마법사: 폴더 프리셋(`260910-01`) → mock 또는 이미 있는 백엔드로 샘플 1건 분류 → `docudog_ping`이 초록인지 트레이에 표시. 실패는 “Python/MCP 토글” 한 줄. 웹 온보딩 없음.
-
-- **260910-06. 공유 폴더 최신 시각을 MCP에 명시**  
-  **갭:** UNC 감시는 있으나, 코파일럿이 `last_analyzed_utc`만 보면 NAS에서 방금 덮어쓴 파일을 낡은 분류본으로 말할 수 있음. 다중 PC 실시간 동기화는 하지 않음(제품 범위 밖).  
-  **방향:** 검색/resolve 결과에 `file_mtime_utc` vs `last_analyzed_utc`, `stale_classification` 플래그. “다시 분류 대기 중”을 한 줄로. 원본 복사·팀 서버 없음.
 
 - **260818-05. 태그 오버라이드 revision (에이전트 덮어쓰기 방지)**  
   **출처:** DocBank If-Match / stale revision → 412.  
@@ -107,6 +101,8 @@ DocBank = 바이트의 권위(보관소). DocuDog = 의미의 권위(분류·P�
 
 ### 완료 (Done)
 
+- **260910-02. 코파일럿용 최신본 해석 (`_v1` / `_최종_진짜`)**: `docudog/freshness.py` 가 파일명 정규화 그룹에서 mtime·최종/초안 토큰·버전 번호로 최신 1건을 뽑아 `is_latest` / `superseded_by` / `latest_reason` 을 search·semantic_search·get 결과에 붙임. `docudog_search(latest_only=true)` 와 신규 `docudog_resolve(query)`(최신본 + 이전 버전 요약 1회 호출). 원본 파일명은 바꾸지 않음. — 2026-09-17
+- **260910-06. 공유 폴더 최신 시각을 MCP에 명시**: 같은 응답에 `file_mtime_utc` / `file_exists` / `stale_classification` / `stale_reason`. 디스크 mtime이 `last_analyzed_utc` 보다 `freshness_settings.stale_skew_seconds`(기본 60) 이상 최신이면 "재분류 대기 중" 한 줄. 다중 PC 동기화·원본 복사 없음. — 2026-09-17
 - **260910-01. 바탕화면·다운로드·공유 폴더 프리셋 + 문서만 필터**: `folder_presets`(Desktop/Downloads/Documents, UNC는 `extra_directories`), 트레이 Watch folders, 설치파일·이미지·`~$`/`.crdownload` 스킵, Downloads `downloads_min_age_seconds`. 원본 이동 없음. — 2026-09-10
 - **260907-01. 로컬·클라우드 LLM 공용 MCP 게이트웨이**: 기존 stdio MCP를 유지하면서 선택형 Streamable HTTP(`/mcp`) 실행 경로를 추가함. 기본 비활성, 환경변수 Bearer 토큰, loopback 기본 바인딩, Host/Origin 보호, P등급·allowlist·발췌 정책 재사용. — 2026-09-07
 - **260903-01. 선택형 로컬 하이브리드 의미검색 (Zvec)** (`semantic_search.enabled`, 기본 false): Zvec FTS+벡터 RRF 문단 인덱스, SHA 증분 교체·총 청크 상한, P1/P2 미색인, allowlist/발췌 정책 MCP 게이트, `docudog_semantic_search`, 기존 코퍼스 재빌드·오프라인 smoke를 추가함. 선택 의존성은 `requirements-semantic.txt`. — 2026-09-07

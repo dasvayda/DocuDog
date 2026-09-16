@@ -198,11 +198,15 @@ def build_mcp_server(config_dir: str | None = None):
         until: str = "",
         offset: int = 0,
         cursor: str = "",
+        latest_only: bool = False,
     ) -> str:
         """
         Search classified DocuDog state (path/summary/tags/category).
         level: optional P1|P2|P3|P4. since/until: UTC YYYY-MM-DD.
         Pagination uses either a zero-based offset or the returned opaque cursor.
+        Each row carries is_latest / superseded_by and stale_classification, so
+        prefer the latest copy and say when a classification is waiting for a
+        re-run. latest_only: drop rows that a newer version replaces.
         Not full-text of unscanned files.
         """
         return json.dumps(
@@ -217,9 +221,22 @@ def build_mcp_server(config_dir: str | None = None):
                 until=until,
                 offset=offset,
                 cursor=cursor,
+                latest_only=latest_only,
             ),
             ensure_ascii=False,
             indent=2,
+        )
+
+    @mcp.tool()
+    def docudog_resolve(query: str, limit: int = 3) -> str:
+        """
+        Best answer for "latest <topic>" in one call: latest copies only, each with
+        the previous versions it replaces and why it won (mtime, filename token,
+        version number). Use this instead of search when the user asks for the
+        current or final document.
+        """
+        return json.dumps(
+            svc.resolve(query, limit=limit), ensure_ascii=False, indent=2
         )
 
     @mcp.tool()

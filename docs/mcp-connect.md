@@ -55,7 +55,8 @@ Use paths from `--print-install` (do not leave placeholders).
 |------|---------|
 | `docudog_ping` | Health + state path |
 | `docudog_status` | Today / actions / digest |
-| `docudog_search` | Corpus search; optional `since`/`until` UTC dates; page with `offset` or returned `cursor` |
+| `docudog_search` | Corpus search; optional `since`/`until` UTC dates; page with `offset` or returned `cursor`; `latest_only: true` hides superseded copies |
+| `docudog_resolve` | "Latest <topic>" in one call: latest copies plus the versions they replace and why |
 | `docudog_semantic_search` | Optional local Zvec full-text + semantic chunk search. Requires `requirements-semantic.txt`, `semantic_search.enabled: true`, and an index rebuild or later classification. |
 | `docudog_get` | One file meta (path or `file_id`, optional excerpt) |
 | `docudog_get_lineage` | Latest version in a thread + member timeline |
@@ -67,6 +68,23 @@ Use paths from `--print-install` (do not leave placeholders).
 | `docudog_related` | Related paths for an anchor |
 
 Not a full-disk or Cowork folder sync. DocuDog **watcher** must have classified files into `DocuDog_state.json` first. Threads/`file_id` are written when status refreshes (daemon classify or startup).
+
+## Freshness fields (`freshness_settings`, on by default)
+
+`docudog_search` / `docudog_resolve` / `docudog_get` / `docudog_semantic_search` rows carry:
+
+| Field | Meaning for the answer |
+|-------|------------------------|
+| `is_latest` | `false` means a newer copy of the same document exists — quote the newer one |
+| `superseded_by` | Absolute path of that newer copy |
+| `latest_reason` | One line for why it won (disk mtime, `_최종` style token, version number) |
+| `file_mtime_utc` vs `last_analyzed_utc` | Disk write time vs the time DocuDog classified it |
+| `stale_classification` | `true` when the file was written after classification (shared folder / NAS overwrite). Say the summary and P level may be out of date. |
+| `file_exists` | `false` means the path is gone; the record is a past snapshot |
+
+`stale_skew_seconds` (default 60) absorbs clock/filesystem skew. DocuDog does not
+rename files to mark a final version, and it does not sync shared folders between
+PCs — it only reports what the timestamps say.
 
 ## Security defaults (`mcp_settings` in config)
 

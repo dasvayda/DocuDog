@@ -90,7 +90,23 @@ hash 변경 재분류 시 `summary_history[]`, `last_change_summary`. `llm_chang
 ## MCP (`tools/docudog_mcp.py`)
 
 외부 AI(Cursor/Claude Desktop)가 산출물을 **재첨부 없이** 질의. 연결: [mcp-connect.md](mcp-connect.md).  
-도구 ↔ 산출물: `docudog_search`/`get` → `DocuDog_state.json`; `docudog_status` → status/digest + `threads_top`; `docudog_thread` → `state.threads`; `docudog_by_hash` → 동일 SHA; `docudog_last_classify` → last_classify JSON.
+도구 ↔ 산출물: `docudog_search`/`get` → `DocuDog_state.json`; `docudog_status` → status/digest + `threads_top`; `docudog_thread` → `state.threads`; `docudog_by_hash` → 동일 SHA; `docudog_last_classify` → last_classify JSON; `docudog_resolve` → state + 디스크 mtime으로 최신본 1건 + 이전 버전.
+
+## 최신본·낡은 분류 신호 (`freshness_settings`)
+
+`docudog/freshness.py`가 계산해 검색·resolve·get 응답에 얹는 필드. state 파일에는 쓰지 않음(호출 시점 계산).
+
+| 필드 | 의미 |
+|------|------|
+| `is_latest` | 같은 계열(`_v1` / `_최종_진짜` 정규화) 중 최신본인지 |
+| `superseded_by` | 최신본 절대 경로 (`is_latest: false` 일 때) |
+| `latest_reason` | 판정 근거 한 줄 (디스크 mtime · 파일명 토큰 · 버전 번호) |
+| `file_mtime_utc` | 디스크 수정 시각 (UTC ISO). 읽을 수 없으면 `""` |
+| `stale_classification` | `file_mtime_utc` 가 `last_analyzed_utc` 보다 `stale_skew_seconds`(기본 60) 이상 최신 → `true` |
+| `stale_reason` | "분석 이후 파일이 수정됨 — 재분류 대기 중" 등 한 줄 |
+| `file_exists` | 경로에 파일이 남아 있는지 |
+
+읽는 쪽 규칙: `is_latest: false` 는 인용하지 말고 `superseded_by` 를 따라감. `stale_classification: true` 면 요약·P등급이 낡았을 수 있음을 답변에 밝힘. 원본 파일명 변경·PC 간 동기화는 하지 않음.
 
 ## 규칙 힌트 (`rule_settings`)
 
